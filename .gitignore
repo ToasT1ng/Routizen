@@ -1,0 +1,29 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# builds
+dist/
+build/
+out/
+.next/
+*.tsbuildinfo
+
+# tauri
+apps/desktop/src-tauri/target/
+
+# env / secrets
+.env
+.env.*
+!.env.example
+*-service-account*.json
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# misc
+.DS_Store
+coverage/
+*.log

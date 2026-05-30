@@ -1,0 +1,22 @@
+{
+  "name": "routizen",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Routizen — 루틴 형성을 돕는 스케줄링 앱",
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "firebase/functions"
+  ],
+  "scripts": {
+    "build:core": "npm run build -w @routizen/core",
+    "test": "npm run test -w @routizen/core",
+    "test:core": "npm run test -w @routizen/core",
+    "dev:web": "npm run dev -w @routizen/web",
+    "build:web": "npm run build -w @routizen/web",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
