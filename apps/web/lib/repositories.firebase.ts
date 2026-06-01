@@ -13,7 +13,6 @@ import {
   getDoc,
   getDocs,
   query,
-  serverTimestamp,
   setDoc,
   updateDoc,
   where,
@@ -104,7 +103,7 @@ export function createFirebaseRepositories(): Repositories {
         // 실행 시 상태를 확인하므로(멱등) 별도 취소 불필요 — 기획 3.3.
         await updateDoc(doc(db, "alarmInstances", id), {
           state: "DONE",
-          completedAt: serverTimestamp(),
+          completedAt: Date.now(), // epoch ms — startAt/endAt 과 동일 단위
         });
       },
     },

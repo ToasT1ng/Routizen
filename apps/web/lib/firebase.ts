@@ -1,6 +1,6 @@
 import { getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
-import { getFirestore, type Firestore } from "firebase/firestore";
+import { getFirestore, initializeFirestore, type Firestore } from "firebase/firestore";
 
 const config = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -23,6 +23,17 @@ export function getFirebaseAuth(): Auth {
   return getAuth(getFirebaseApp());
 }
 
+let cachedDb: Firestore | null = null;
+
 export function getDb(): Firestore {
-  return getFirestore(getFirebaseApp());
+  if (cachedDb) return cachedDb;
+  // ignoreUndefinedProperties: 선택 필드(memo/displayName/photoURL 등)가 undefined 여도
+  // 쓰기가 실패하지 않도록(기본값은 undefined 시 예외).
+  try {
+    cachedDb = initializeFirestore(getFirebaseApp(), { ignoreUndefinedProperties: true });
+  } catch {
+    // 이미 초기화된 경우(중복 호출) 기존 인스턴스 사용
+    cachedDb = getFirestore(getFirebaseApp());
+  }
+  return cachedDb;
 }
