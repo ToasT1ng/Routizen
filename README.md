@@ -46,6 +46,7 @@ npm run dev:web        # 웹앱 개발 서버 (http://localhost:3000)
 3. Cloud Tasks 큐 생성: 리전 `asia-northeast3`, 큐 이름 `routizen-alarms`
 4. 함수 환경변수/시크릿 설정:
    - `ALARM_TASK_URL` (배포된 onAlarmTask URL), `TASK_INVOKER_SA`
+   - `TASK_SECRET` (onAlarmTask 호출 검증용 공유 시크릿)
    - `RESEND_API_KEY`, `FROM_EMAIL`
 5. 함수 런타임 타임존을 `Asia/Seoul` 로 설정(현재 KST 운영 가정)
 6. 배포:

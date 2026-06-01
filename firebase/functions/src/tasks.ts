@@ -27,7 +27,10 @@ export async function enqueueAlarmTask(payload: AlarmTaskPayload, fireAtMs: numb
       httpRequest: {
         httpMethod: "POST",
         url: CONFIG.alarmTaskUrl,
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(CONFIG.taskSecret ? { "X-Routizen-Task-Secret": CONFIG.taskSecret } : {}),
+        },
         body: Buffer.from(JSON.stringify(payload)).toString("base64"),
         // Cloud Tasks → 함수 인증 (OIDC). SA 미설정 시 공개 함수로 호출.
         ...(CONFIG.taskInvokerSA

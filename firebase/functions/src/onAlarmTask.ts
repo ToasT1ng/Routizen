@@ -17,6 +17,13 @@ import type { AlarmTaskPayload } from "./tasks.js";
  * 중복 호출이나 이미 "실행했음"(DONE) 인 경우 알림을 보내지 않는다.
  */
 export const onAlarmTask = onRequest({ region: CONFIG.region }, async (req, res) => {
+  // 공유 시크릿 검증 — Cloud Tasks 이외의 외부 호출(알림 스푸핑/상태 변경) 차단.
+  // 시크릿 미설정 시(에뮬레이터) 검증 생략.
+  if (CONFIG.taskSecret && req.header("X-Routizen-Task-Secret") !== CONFIG.taskSecret) {
+    res.status(403).send("forbidden");
+    return;
+  }
+
   const payload = req.body as AlarmTaskPayload;
   if (!payload?.instanceId || !payload?.kind) {
     res.status(400).send("bad payload");

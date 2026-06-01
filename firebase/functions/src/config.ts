@@ -11,6 +11,8 @@ export const CONFIG = {
   alarmTaskUrl: process.env.ALARM_TASK_URL ?? "",
   /** Cloud Tasks → 함수 호출 시 사용할 서비스 계정 이메일 (OIDC) */
   taskInvokerSA: process.env.TASK_INVOKER_SA ?? "",
+  /** onAlarmTask 호출 검증용 공유 시크릿 (Cloud Tasks 헤더로 전달). 미설정 시 검증 생략(에뮬레이터) */
+  taskSecret: process.env.TASK_SECRET ?? "",
   /** Resend 이메일 */
   resendApiKey: process.env.RESEND_API_KEY ?? "",
   fromEmail: process.env.FROM_EMAIL ?? "Routizen <noreply@routizen.app>",

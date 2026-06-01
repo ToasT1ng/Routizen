@@ -15,6 +15,11 @@ import { materializeForDate } from "./scheduler.js";
  * 운영 배포 시에는 비활성화/보호 필요.
  */
 export const materializeNow = onRequest({ region: CONFIG.region }, async (req, res) => {
+  // 에뮬레이터 전용 — 운영 환경에서는 비활성화(누구나 호출 가능한 트리거 방지)
+  if (process.env.FUNCTIONS_EMULATOR !== "true") {
+    res.status(403).send("disabled in production");
+    return;
+  }
   const dateParam = typeof req.query.date === "string" ? req.query.date : undefined;
   const date = dateParam ? new Date(`${dateParam}T00:00:00`) : new Date();
   const created = await materializeForDate(date);
