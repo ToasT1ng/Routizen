@@ -11,8 +11,18 @@ import {
 } from "@routizen/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { enablePush, isPushSupported, listenForegroundMessages } from "@/lib/messaging";
 import { createFirebaseRepositories } from "@/lib/repositories.firebase";
 import { ScheduleForm, type NewSchedule } from "./ScheduleForm";
+
+type PushStatus = "checking" | "unsupported" | "default" | "granted" | "denied";
+
+const PUSH_MESSAGE: Record<Exclude<PushStatus, "checking">, string> = {
+  unsupported: "이 브라우저는 푸시 알림을 지원하지 않아요 (iOS Safari는 홈 화면 추가 후 가능).",
+  default: "알림을 켜면 시작·끝·마지막 알람을 푸시로 받을 수 있어요.",
+  granted: "푸시 알림이 켜져 있어요 ✓",
+  denied: "브라우저에서 알림이 차단됐어요. 사이트 설정에서 허용해 주세요.",
+};
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -46,6 +56,7 @@ export function Dashboard() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [todayAlarms, setTodayAlarms] = useState<AlarmInstance[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pushStatus, setPushStatus] = useState<PushStatus>("checking");
 
   const uid = profile?.uid;
   const today = useMemo(() => toDateKey(new Date()), []);
@@ -68,6 +79,33 @@ export function Dashboard() {
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  // 푸시 지원/권한 상태 확인 + 포그라운드 메시지 리스너 등록(기획 3.2).
+  useEffect(() => {
+    let unsub: (() => void) | undefined;
+    void (async () => {
+      if (!(await isPushSupported())) {
+        setPushStatus("unsupported");
+        return;
+      }
+      setPushStatus(Notification.permission as PushStatus);
+      unsub = await listenForegroundMessages();
+    })();
+    return () => unsub?.();
+  }, []);
+
+  const handleEnablePush = useCallback(async () => {
+    if (!uid) return;
+    const result = await enablePush(uid, repos);
+    if (result.ok) {
+      setPushStatus("granted");
+      await refreshProfile();
+    } else if (result.reason === "denied") {
+      setPushStatus("denied");
+    } else if (result.reason === "unsupported") {
+      setPushStatus("unsupported");
+    }
+  }, [uid, repos, refreshProfile]);
 
   if (!profile) return null;
 
@@ -123,6 +161,23 @@ export function Dashboard() {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* 푸시 알림 (FCM 웹 푸시 — 기획 2.5 / 3.2) */}
+      <div className="card">
+        <h2>알림</h2>
+        {pushStatus === "checking" ? (
+          <p className="muted">확인 중…</p>
+        ) : (
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <span className="muted">{PUSH_MESSAGE[pushStatus]}</span>
+            {pushStatus === "default" && (
+              <button className="btn" onClick={() => void handleEnablePush()}>
+                알림 켜기
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 오늘의 알람 */}
