@@ -15,13 +15,14 @@ import { enablePush, isPushSupported, listenForegroundMessages } from "@/lib/mes
 import { createFirebaseRepositories } from "@/lib/repositories.firebase";
 import { ScheduleForm, type NewSchedule } from "./ScheduleForm";
 
-type PushStatus = "checking" | "unsupported" | "default" | "granted" | "denied";
+type PushStatus = "checking" | "unsupported" | "default" | "granted" | "denied" | "error";
 
 const PUSH_MESSAGE: Record<Exclude<PushStatus, "checking">, string> = {
   unsupported: "이 브라우저는 푸시 알림을 지원하지 않아요 (iOS Safari는 홈 화면 추가 후 가능).",
   default: "알림을 켜면 시작·끝·마지막 알람을 푸시로 받을 수 있어요.",
   granted: "푸시 알림이 켜져 있어요 ✓",
   denied: "브라우저에서 알림이 차단됐어요. 사이트 설정에서 허용해 주세요.",
+  error: "알림 설정에 실패했어요. 잠시 후 다시 시도해 주세요.",
 };
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -104,6 +105,9 @@ export function Dashboard() {
       setPushStatus("denied");
     } else if (result.reason === "unsupported") {
       setPushStatus("unsupported");
+    } else {
+      // no-vapid / error — 사용자에게 실패를 노출(이전엔 무반응)
+      setPushStatus("error");
     }
   }, [uid, repos, refreshProfile]);
 
@@ -171,9 +175,9 @@ export function Dashboard() {
         ) : (
           <div className="row" style={{ justifyContent: "space-between" }}>
             <span className="muted">{PUSH_MESSAGE[pushStatus]}</span>
-            {pushStatus === "default" && (
+            {(pushStatus === "default" || pushStatus === "error") && (
               <button className="btn" onClick={() => void handleEnablePush()}>
-                알림 켜기
+                {pushStatus === "error" ? "다시 시도" : "알림 켜기"}
               </button>
             )}
           </div>

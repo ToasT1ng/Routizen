@@ -23,12 +23,13 @@ export async function sendAlarmNotification(params: {
   const heading = stage === "final" ? "마지막 알림" : "Routizen";
 
   // 1) PUSH (FCM 멀티캐스트) — 웹/안드/iOS. 맥은 아래 notifications 문서로 처리.
+  // data-only 메시지로 발송: notification 페이로드를 넣으면 웹에서 SDK 자동 표시 +
+  // onBackgroundMessage 가 동시에 동작해 알림이 중복된다. 표시는 클라이언트(SW/포그라운드)가 전담.
   const tokens = user.fcmTokens.map((t) => t.token).filter(Boolean);
   if (tokens.length > 0) {
     await messaging.sendEachForMulticast({
       tokens,
-      notification: { title: heading, body },
-      data: { instanceId, scheduleId, stage },
+      data: { title: heading, body, instanceId, scheduleId, stage },
     });
   }
 

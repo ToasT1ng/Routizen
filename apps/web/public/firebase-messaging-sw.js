@@ -19,13 +19,15 @@ if (config.projectId) {
   const messaging = firebase.messaging();
 
   // 백그라운드(탭 비활성/닫힘) 메시지 → OS 알림 표시.
+  // data-only 발송이므로 제목/본문은 payload.data 에서 읽는다(notify.ts 참조).
   messaging.onBackgroundMessage((payload) => {
-    const title = payload.notification?.title || "Routizen";
-    const body = payload.notification?.body || "";
+    const data = payload.data || {};
+    const title = data.title || "Routizen";
+    const body = data.body || "";
     self.registration.showNotification(title, {
       body,
       icon: "/icon-192.png",
-      data: payload.data || {},
+      data,
     });
   });
 }

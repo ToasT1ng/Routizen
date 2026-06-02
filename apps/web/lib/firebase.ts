@@ -15,13 +15,11 @@ export const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-const config = firebaseConfig;
-
 let cachedApp: FirebaseApp | null = null;
 
 export function getFirebaseApp(): FirebaseApp {
   if (cachedApp) return cachedApp;
-  cachedApp = getApps().length ? getApps()[0]! : initializeApp(config);
+  cachedApp = getApps().length ? getApps()[0]! : initializeApp(firebaseConfig);
   return cachedApp;
 }
 

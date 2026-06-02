@@ -72,16 +72,21 @@ export async function enablePush(uid: string, repos: Repositories): Promise<Push
 
 /**
  * 포그라운드(탭이 열려 있을 때) 메시지 수신 → OS 알림 표시.
- * 백그라운드는 SW 의 onBackgroundMessage 가 처리한다.
+ * 백그라운드는 SW 의 onBackgroundMessage 가 처리한다. 발송은 data-only 이므로
+ * 제목/본문은 payload.data 에서 읽는다(notify.ts 참조).
+ * 표시는 SW registration.showNotification 을 사용 — new Notification() 은 모바일
+ * Chrome 등에서 throw 하므로 플랫폼 호환을 위해 SW 경유로 통일.
  * @returns 구독 해제 함수
  */
 export async function listenForegroundMessages(): Promise<() => void> {
   if (!(await isPushSupported())) return () => {};
   return onMessage(messaging(), (payload) => {
-    const title = payload.notification?.title ?? "Routizen";
-    const body = payload.notification?.body ?? "";
-    if (Notification.permission === "granted") {
-      new Notification(title, { body, icon: "/icon-192.png" });
-    }
+    const data = payload.data ?? {};
+    const title = data.title ?? "Routizen";
+    const body = data.body ?? "";
+    if (Notification.permission !== "granted") return;
+    void navigator.serviceWorker.ready.then((registration) =>
+      registration.showNotification(title, { body, icon: "/icon-192.png", data }),
+    );
   });
 }
