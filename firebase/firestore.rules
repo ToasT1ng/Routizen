@@ -1,0 +1,49 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function userIsPremium() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isPremium == true;
+    }
+
+    // 사용자 프로필 — 본인만. isPremium/subscription 은 클라이언트가 못 바꿈(서버 전용).
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid)
+        && request.resource.data.isPremium == false;
+      allow update: if isOwner(uid)
+        && request.resource.data.isPremium == resource.data.isPremium
+        && request.resource.data.subscription == resource.data.subscription;
+    }
+
+    // 일정 — 본인만. 추가 알람 슬롯(extraAlarms)은 프리미엄만 비울 수 있음.
+    // (무료 10개 제한은 Cloud Function/클라이언트에서 추가 검증 — 기획 4장)
+    match /schedules/{id} {
+      allow read, delete: if isOwner(resource.data.uid);
+      allow create: if isOwner(request.resource.data.uid)
+        && (request.resource.data.extraAlarms.size() == 0 || userIsPremium());
+      allow update: if isOwner(resource.data.uid)
+        && (request.resource.data.extraAlarms.size() == 0 || userIsPremium());
+    }
+
+    // 알람 인스턴스 — 생성/삭제는 서버(Functions, admin)만.
+    // 클라이언트는 본인 것을 읽고, "실행했음"(state=DONE) 으로만 업데이트 가능.
+    match /alarmInstances/{id} {
+      allow read: if isOwner(resource.data.uid);
+      allow update: if isOwner(resource.data.uid)
+        && request.resource.data.state == 'DONE'
+        && request.resource.data.uid == resource.data.uid;
+      allow create, delete: if false;
+    }
+
+    // 알림 로그 — 본인 읽기만. 쓰기는 서버 전용.
+    match /notifications/{id} {
+      allow read: if isOwner(resource.data.uid);
+      allow write: if false;
+    }
+  }
+}
