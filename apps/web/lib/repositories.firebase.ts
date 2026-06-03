@@ -1,6 +1,7 @@
 import type {
   AlarmInstance,
   AlarmStyle,
+  FcmTokenEntry,
   Repositories,
   Schedule,
   User,
@@ -13,6 +14,7 @@ import {
   getDoc,
   getDocs,
   query,
+  runTransaction,
   setDoc,
   updateDoc,
   where,
@@ -53,6 +55,20 @@ export function createFirebaseRepositories(): Repositories {
       },
       async setAlarmStyle(uid, style: AlarmStyle) {
         await updateDoc(doc(db, "users", uid), { alarmStyle: style });
+      },
+      async addFcmToken(uid, entry: FcmTokenEntry) {
+        // 같은 token 중복을 제거하고 새 항목으로 교체(read-modify-write).
+        // arrayUnion 은 updatedAt 차이로 중복이 쌓이므로 트랜잭션으로 dedupe.
+        const ref = doc(db, "users", uid);
+        await runTransaction(db, async (tx) => {
+          const snap = await tx.get(ref);
+          if (!snap.exists()) return;
+          const tokens = ((snap.data().fcmTokens ?? []) as FcmTokenEntry[]).filter(
+            (t) => t.token !== entry.token,
+          );
+          tokens.push(entry);
+          tx.update(ref, { fcmTokens: tokens });
+        });
       },
     },
 
