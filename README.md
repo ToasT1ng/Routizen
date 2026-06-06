@@ -54,8 +54,10 @@ npm run dev:web        # 웹앱 개발 서버 (http://localhost:3000)
    cd firebase && firebase deploy --only firestore:rules,firestore:indexes,functions
    ```
 
-> ⚠️ 배포 시 `firebase/functions` 가 워크스페이스 패키지 `@routizen/core` 를 참조하므로,
-> 클라우드 빌드에서 해석되도록 core 를 번들/패킹하는 predeploy 단계가 필요하다(현재 로컬 심볼릭 링크로 타입체크만 검증됨).
+> 배포 시 `firebase/functions` 의 빌드(`predeploy`)는 esbuild 로 `src/index.ts` 를 단일 ESM
+> 번들(`dist/index.js`)로 묶는다. 워크스페이스 패키지 `@routizen/core` 는 번들에 인라인되고,
+> 런타임 의존성(firebase-admin 등)만 external 로 남아 클라우드에서 `npm install` 된다.
+> 따라서 미게시 워크스페이스 패키지를 클라우드가 해석할 필요가 없다.
 
 ## 검증 (Firebase Emulator)
 
