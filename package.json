@@ -14,6 +14,8 @@
     "test:core": "npm run test -w @routizen/core",
     "dev:web": "npm run dev -w @routizen/web",
     "build:web": "npm run build -w @routizen/web",
+    "dev:desktop": "npm run dev -w @routizen/desktop",
+    "build:desktop": "npm run build -w @routizen/desktop",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "engines": {
