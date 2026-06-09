@@ -10,6 +10,7 @@
 ```
 packages/core        도메인 로직 — 타입, 반복일정 계산, 알람 상태머신, 메시지 카탈로그, repo 인터페이스
 apps/web             Next.js(SPA export) 웹앱 — 웹/Tauri/Capacitor 공통 번들
+apps/desktop         Tauri(맥) 래퍼 — 웹 번들 로드 + Firestore 리스너→OS 로컬 알림, 메뉴바 상주
 firebase/functions   Cloud Functions — 알람 엔진(머터리얼라이즈 cron, Cloud Tasks, onAlarmTask), FCM/이메일
 firebase/firestore.* 보안 규칙 / 인덱스
 ```
@@ -36,7 +37,7 @@ npm run dev:web        # 웹앱 개발 서버 (http://localhost:3000)
 | 알람 엔진(cron + Cloud Tasks + 상태머신) | ✅ `firebase/functions` |
 | FCM 푸시 발송 + 마지막 알람 이메일(Resend) | ✅ 서버 발송 `firebase/functions/notify.ts` |
 | 웹 FCM 푸시 수신(서비스워커·토큰 등록·포그라운드) | ✅ `apps/web/lib/messaging.ts` |
-| 맥앱(Tauri) | ⏳ 미착수 (로드맵 2단계) |
+| 맥앱(Tauri) | 🚧 스캐폴드 + 알림 브리지 `apps/desktop` (Rust 설치·코드서명 후 빌드) |
 | 결제 연동 | ⏳ 초기 미연동 — 안내 문구만 (기획 3.5) |
 | iOS/Android(Capacitor) | ⏳ 추후 |
 
@@ -57,8 +58,37 @@ npm run dev:web        # 웹앱 개발 서버 (http://localhost:3000)
    cd firebase && firebase deploy --only firestore:rules,firestore:indexes,functions
    ```
 
-> ⚠️ 배포 시 `firebase/functions` 가 워크스페이스 패키지 `@routizen/core` 를 참조하므로,
-> 클라우드 빌드에서 해석되도록 core 를 번들/패킹하는 predeploy 단계가 필요하다(현재 로컬 심볼릭 링크로 타입체크만 검증됨).
+> 배포 시 `firebase/functions` 의 빌드(`predeploy`)는 esbuild 로 `src/index.ts` 를 단일 ESM
+> 번들(`dist/index.js`)로 묶는다. 워크스페이스 패키지 `@routizen/core` 는 번들에 인라인되고,
+> 런타임 의존성(firebase-admin 등)만 external 로 남아 클라우드에서 `npm install` 된다.
+> 따라서 미게시 워크스페이스 패키지를 클라우드가 해석할 필요가 없다.
+
+## 맥앱 (Tauri)
+
+`apps/desktop` 은 웹 정적 번들(`apps/web/out`)을 그대로 로드하는 Tauri 래퍼다. WKWebView 가
+웹푸시를 지원하지 않으므로(기획 3.2), 알림은 공유 번들의 브리지(`apps/web/lib/desktopNotifications.ts`)가
+Firestore `notifications` 문서를 실시간 구독해 `@tauri-apps/plugin-notification` 으로 OS 알림을 띄운다.
+이 브리지는 Tauri 런타임에서만 동작하고 브라우저에서는 no-op 이다. 창을 닫으면 종료되지 않고
+메뉴바(트레이)로 상주해 백그라운드에서 알림 수신을 유지한다.
+
+선행 조건:
+
+```bash
+# 1) Rust 툴체인 설치 (https://rustup.rs)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# 2) (최초 1회) 실제 로고로 아이콘 세트 생성 — 현재는 플레이스홀더 PNG 가 들어있음
+npm run icon -w @routizen/desktop      # src-tauri/icons/app-icon.png 를 소스로 사용
+```
+
+개발 / 빌드:
+
+```bash
+npm run dev:desktop      # 웹 dev 서버 자동 기동 + Tauri 창 (http://localhost:3000 로드)
+npm run build:desktop    # 웹 정적 빌드 후 .app/.dmg 번들 생성
+```
+
+> 배포(.dmg)에는 Apple 개발자 계정($99/년) 기반 **코드서명·공증**이 필요하다(기획 3.2, 미구현 — 후속).
 
 ## 검증 (Firebase Emulator)
 

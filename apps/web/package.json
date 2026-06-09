@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@routizen/core": "*",
+    "@tauri-apps/plugin-notification": "^2.0.0",
     "firebase": "^10.13.0",
     "next": "^14.2.5",
     "react": "^18.3.1",

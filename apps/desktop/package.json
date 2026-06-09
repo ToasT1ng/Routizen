@@ -1,0 +1,15 @@
+{
+  "name": "@routizen/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Routizen 데스크톱(macOS) 앱 — 웹 번들 래핑 + Firestore 리스너→로컬 알림",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "icon": "tauri icon src-tauri/icons/app-icon.png",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0"
+  }
+}
