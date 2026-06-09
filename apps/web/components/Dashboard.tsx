@@ -11,8 +11,28 @@ import {
 } from "@routizen/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { enablePush, isPushSupported, listenForegroundMessages } from "@/lib/messaging";
 import { createFirebaseRepositories } from "@/lib/repositories.firebase";
 import { ScheduleForm, type NewSchedule } from "./ScheduleForm";
+
+type PushStatus =
+  | "checking"
+  | "unsupported"
+  | "default"
+  | "granted"
+  | "denied"
+  | "misconfigured"
+  | "error";
+
+const PUSH_MESSAGE: Record<Exclude<PushStatus, "checking">, string> = {
+  unsupported: "이 브라우저는 푸시 알림을 지원하지 않아요 (iOS Safari는 홈 화면 추가 후 가능).",
+  default: "알림을 켜면 시작·끝·마지막 알람을 푸시로 받을 수 있어요.",
+  granted: "푸시 알림이 켜져 있어요 ✓",
+  denied: "브라우저에서 알림이 차단됐어요. 사이트 설정에서 허용해 주세요.",
+  // VAPID 키 미설정 — 재시도해도 안 되는 서버 설정 문제이므로 재시도 버튼을 띄우지 않는다.
+  misconfigured: "푸시 알림이 아직 설정되지 않았어요. 잠시 후 지원될 예정이에요.",
+  error: "알림 설정에 실패했어요. 잠시 후 다시 시도해 주세요.",
+};
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -46,6 +66,7 @@ export function Dashboard() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [todayAlarms, setTodayAlarms] = useState<AlarmInstance[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pushStatus, setPushStatus] = useState<PushStatus>("checking");
 
   const uid = profile?.uid;
   const today = useMemo(() => toDateKey(new Date()), []);
@@ -68,6 +89,39 @@ export function Dashboard() {
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  // 푸시 지원/권한 상태 확인 + 포그라운드 메시지 리스너 등록(기획 3.2).
+  useEffect(() => {
+    let unsub: (() => void) | undefined;
+    void (async () => {
+      if (!(await isPushSupported())) {
+        setPushStatus("unsupported");
+        return;
+      }
+      setPushStatus(Notification.permission as PushStatus);
+      unsub = await listenForegroundMessages();
+    })();
+    return () => unsub?.();
+  }, []);
+
+  const handleEnablePush = useCallback(async () => {
+    if (!uid) return;
+    const result = await enablePush(uid, repos);
+    if (result.ok) {
+      setPushStatus("granted");
+      await refreshProfile();
+    } else if (result.reason === "denied") {
+      setPushStatus("denied");
+    } else if (result.reason === "unsupported") {
+      setPushStatus("unsupported");
+    } else if (result.reason === "no-vapid") {
+      // 서버 설정(VAPID) 문제 — 재시도 대상이 아님(아래 misconfigured 메시지).
+      setPushStatus("misconfigured");
+    } else {
+      // 일시적 오류 — 사용자에게 실패를 노출하고 재시도 허용(이전엔 무반응)
+      setPushStatus("error");
+    }
+  }, [uid, repos, refreshProfile]);
 
   if (!profile) return null;
 
@@ -123,6 +177,23 @@ export function Dashboard() {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* 푸시 알림 (FCM 웹 푸시 — 기획 2.5 / 3.2) */}
+      <div className="card">
+        <h2>알림</h2>
+        {pushStatus === "checking" ? (
+          <p className="muted">확인 중…</p>
+        ) : (
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <span className="muted">{PUSH_MESSAGE[pushStatus]}</span>
+            {(pushStatus === "default" || pushStatus === "error") && (
+              <button className="btn" onClick={() => void handleEnablePush()}>
+                {pushStatus === "error" ? "다시 시도" : "알림 켜기"}
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 오늘의 알람 */}

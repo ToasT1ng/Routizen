@@ -35,7 +35,8 @@ npm run dev:web        # 웹앱 개발 서버 (http://localhost:3000)
 | 무료 10개 제한 + 프리미엄 안내 게이팅 | ✅ |
 | 알람 스타일(보통/압박, 사용자 전역) | ✅ |
 | 알람 엔진(cron + Cloud Tasks + 상태머신) | ✅ `firebase/functions` |
-| FCM 푸시 + 마지막 알람 이메일(Resend) | ✅ |
+| FCM 푸시 발송 + 마지막 알람 이메일(Resend) | ✅ 서버 발송 `firebase/functions/notify.ts` |
+| 웹 FCM 푸시 수신(서비스워커·토큰 등록·포그라운드) | ✅ `apps/web/lib/messaging.ts` |
 | 맥앱(Tauri) | 🚧 스캐폴드 + 알림 브리지 `apps/desktop` (Rust 설치·코드서명 후 빌드) |
 | 결제 연동 | ⏳ 초기 미연동 — 안내 문구만 (기획 3.5) |
 | iOS/Android(Capacitor) | ⏳ 추후 |
@@ -44,13 +45,15 @@ npm run dev:web        # 웹앱 개발 서버 (http://localhost:3000)
 
 1. Firebase 프로젝트 생성, 웹 앱 등록 → `apps/web/.env.local` 채우기
 2. Auth: Google·Apple 프로바이더 활성화
-3. Cloud Tasks 큐 생성: 리전 `asia-northeast3`, 큐 이름 `routizen-alarms`
-4. 함수 환경변수/시크릿 설정:
+3. Cloud Messaging: 웹 푸시 인증서(VAPID 키) 발급 → `apps/web/.env.local` 의 `NEXT_PUBLIC_FIREBASE_VAPID_KEY` 채우기.
+   웹앱은 로그인 후 "알림 켜기" 시 서비스워커(`public/firebase-messaging-sw.js`)를 등록하고 FCM 토큰을 `users/{uid}.fcmTokens` 에 저장한다(서버 발송 대상). 알림 아이콘은 `apps/web/public/icon-192.png` 를 두면 사용된다(없어도 동작).
+4. Cloud Tasks 큐 생성: 리전 `asia-northeast3`, 큐 이름 `routizen-alarms`
+5. 함수 환경변수/시크릿 설정:
    - `ALARM_TASK_URL` (배포된 onAlarmTask URL), `TASK_INVOKER_SA`
    - `TASK_SECRET` (onAlarmTask 호출 검증용 공유 시크릿)
    - `RESEND_API_KEY`, `FROM_EMAIL`
-5. 함수 런타임 타임존을 `Asia/Seoul` 로 설정(현재 KST 운영 가정)
-6. 배포:
+6. 함수 런타임 타임존을 `Asia/Seoul` 로 설정(현재 KST 운영 가정)
+7. 배포:
    ```bash
    cd firebase && firebase deploy --only firestore:rules,firestore:indexes,functions
    ```
