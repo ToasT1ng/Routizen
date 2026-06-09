@@ -16,6 +16,8 @@ export interface UserRepository {
    * 단계별 알람 발송 시 user.fcmTokens 로 멀티캐스트되므로(notify.ts) 필수.
    */
   addFcmToken(uid: string, entry: FcmTokenEntry): Promise<void>;
+  /** FCM 토큰 해제(로그아웃 시). 해당 token 항목을 user.fcmTokens 에서 제거한다. */
+  removeFcmToken(uid: string, token: string): Promise<void>;
 }
 
 export interface ScheduleRepository {

@@ -70,6 +70,17 @@ export function createFirebaseRepositories(): Repositories {
           tx.update(ref, { fcmTokens: tokens });
         });
       },
+      async removeFcmToken(uid, token: string) {
+        const ref = doc(db, "users", uid);
+        await runTransaction(db, async (tx) => {
+          const snap = await tx.get(ref);
+          if (!snap.exists()) return;
+          const tokens = ((snap.data().fcmTokens ?? []) as FcmTokenEntry[]).filter(
+            (t) => t.token !== token,
+          );
+          tx.update(ref, { fcmTokens: tokens });
+        });
+      },
     },
 
     schedules: {

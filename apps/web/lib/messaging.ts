@@ -2,6 +2,7 @@
 
 import type { FcmTokenEntry, Repositories } from "@routizen/core";
 import {
+  deleteToken,
   getMessaging,
   getToken,
   isSupported,
@@ -67,6 +68,25 @@ export async function enablePush(uid: string, repos: Repositories): Promise<Push
     return { ok: true, token };
   } catch (error) {
     return { ok: false, reason: "error", error };
+  }
+}
+
+/**
+ * 푸시 해제(로그아웃 시): 현재 기기 토큰을 FCM 에서 폐기하고 user 문서에서 제거.
+ * 공용 기기에서 로그아웃 후에도 푸시가 가는 것을 막는다.
+ * 어떤 실패도 로그아웃을 막지 않도록 모두 무시한다(best-effort).
+ */
+export async function disablePush(uid: string, repos: Repositories): Promise<void> {
+  try {
+    if (!(await isPushSupported()) || !VAPID_KEY) return;
+    if (Notification.permission !== "granted") return;
+    const token = await getToken(messaging(), { vapidKey: VAPID_KEY }).catch(() => null);
+    if (token) {
+      await repos.users.removeFcmToken(uid, token).catch(() => {});
+    }
+    await deleteToken(messaging()).catch(() => {});
+  } catch {
+    // 토큰 정리 실패는 로그아웃을 막지 않는다.
   }
 }
 

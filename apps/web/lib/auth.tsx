@@ -76,8 +76,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    // 로그아웃 전에 이 기기의 FCM 토큰을 폐기·제거(공용 기기에서 잔여 푸시 방지).
+    // best-effort 라 실패해도 로그아웃은 그대로 진행된다.
+    const uid = firebaseUser?.uid;
+    if (uid) {
+      const { disablePush } = await import("./messaging");
+      await disablePush(uid, createFirebaseRepositories());
+    }
     await fbSignOut(getFirebaseAuth());
-  }, []);
+  }, [firebaseUser]);
 
   const refreshProfile = useCallback(async () => {
     if (firebaseUser) await loadProfile(firebaseUser);

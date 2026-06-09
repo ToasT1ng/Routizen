@@ -15,13 +15,22 @@ import { enablePush, isPushSupported, listenForegroundMessages } from "@/lib/mes
 import { createFirebaseRepositories } from "@/lib/repositories.firebase";
 import { ScheduleForm, type NewSchedule } from "./ScheduleForm";
 
-type PushStatus = "checking" | "unsupported" | "default" | "granted" | "denied" | "error";
+type PushStatus =
+  | "checking"
+  | "unsupported"
+  | "default"
+  | "granted"
+  | "denied"
+  | "misconfigured"
+  | "error";
 
 const PUSH_MESSAGE: Record<Exclude<PushStatus, "checking">, string> = {
   unsupported: "이 브라우저는 푸시 알림을 지원하지 않아요 (iOS Safari는 홈 화면 추가 후 가능).",
   default: "알림을 켜면 시작·끝·마지막 알람을 푸시로 받을 수 있어요.",
   granted: "푸시 알림이 켜져 있어요 ✓",
   denied: "브라우저에서 알림이 차단됐어요. 사이트 설정에서 허용해 주세요.",
+  // VAPID 키 미설정 — 재시도해도 안 되는 서버 설정 문제이므로 재시도 버튼을 띄우지 않는다.
+  misconfigured: "푸시 알림이 아직 설정되지 않았어요. 잠시 후 지원될 예정이에요.",
   error: "알림 설정에 실패했어요. 잠시 후 다시 시도해 주세요.",
 };
 
@@ -105,8 +114,11 @@ export function Dashboard() {
       setPushStatus("denied");
     } else if (result.reason === "unsupported") {
       setPushStatus("unsupported");
+    } else if (result.reason === "no-vapid") {
+      // 서버 설정(VAPID) 문제 — 재시도 대상이 아님(아래 misconfigured 메시지).
+      setPushStatus("misconfigured");
     } else {
-      // no-vapid / error — 사용자에게 실패를 노출(이전엔 무반응)
+      // 일시적 오류 — 사용자에게 실패를 노출하고 재시도 허용(이전엔 무반응)
       setPushStatus("error");
     }
   }, [uid, repos, refreshProfile]);

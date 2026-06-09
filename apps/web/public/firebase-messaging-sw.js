@@ -1,8 +1,10 @@
 /* Routizen FCM 웹 푸시 서비스워커 (백그라운드 수신).
  * SW 는 빌드 타임 env 를 못 읽으므로 등록 URL 쿼리스트링으로 전달된
- * Firebase 설정을 사용한다(lib/messaging.ts 의 registerServiceWorker 참조). */
-importScripts("https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js");
-importScripts("https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging-compat.js");
+ * Firebase 설정을 사용한다(lib/messaging.ts 의 registerServiceWorker 참조).
+ * 아래 compat SDK 버전은 apps/web/package.json 의 firebase 버전과 반드시 일치시킬 것
+ * (앱 SDK 와 SW SDK 버전이 어긋나면 토큰/수신 동작이 불일치할 수 있음). */
+importScripts("https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js");
+importScripts("https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js");
 
 const params = new URL(self.location).searchParams;
 const config = {
