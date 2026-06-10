@@ -101,6 +101,9 @@ export const createCheckoutSession = onCall({ region: CONFIG.region }, async (re
     cancel_url: `${CONFIG.appUrl}/?checkout=cancel`,
   });
 
+  if (!session.url) {
+    throw new HttpsError("internal", "Checkout 세션 생성에 실패했습니다.");
+  }
   return { url: session.url };
 });
 
@@ -147,9 +150,15 @@ export const stripeWebhook = onRequest({ region: CONFIG.region }, async (req, re
       case "customer.subscription.created":
       case "customer.subscription.updated":
       case "customer.subscription.deleted": {
-        const sub = event.data.object;
-        const uid = await resolveUid(sub);
-        if (uid) await applySubscription(uid, sub);
+        const obj = event.data.object;
+        const uid = await resolveUid(obj);
+        if (uid) {
+          // Stripe 는 이벤트 순서를 보장하지 않고 재시도한다(역순 도착 가능). 페이로드를 그대로
+          // 믿으면 늦게 온 updated 가 이미 처리한 deleted 를 덮어쓸 수 있으므로, 최신 구독 상태를
+          // 재조회해 반영한다(취소된 구독도 retrieve 가능 — status="canceled").
+          const sub = await stripe().subscriptions.retrieve(obj.id);
+          await applySubscription(uid, sub);
+        }
         break;
       }
       default:
