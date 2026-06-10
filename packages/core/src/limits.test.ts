@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   canCreateSchedule,
   canUseExtraAlarms,
+  deriveIsPremium,
   FREE_SCHEDULE_LIMIT,
   remainingFreeSlots,
 } from "./limits.js";
@@ -22,6 +23,14 @@ describe("canUseExtraAlarms — 프리미엄 전용", () => {
   it("무료는 불가, 프리미엄은 가능", () => {
     expect(canUseExtraAlarms(false)).toBe(false);
     expect(canUseExtraAlarms(true)).toBe(true);
+  });
+});
+
+describe("deriveIsPremium — 구독 상태에서 프리미엄 파생", () => {
+  it("active 만 프리미엄, 그 외(canceled/none)는 무료", () => {
+    expect(deriveIsPremium({ status: "active" })).toBe(true);
+    expect(deriveIsPremium({ status: "canceled" })).toBe(false);
+    expect(deriveIsPremium({ status: "none" })).toBe(false);
   });
 });
 

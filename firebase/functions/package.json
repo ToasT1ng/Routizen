@@ -17,7 +17,8 @@
     "@google-cloud/tasks": "^5.4.0",
     "firebase-admin": "^12.3.1",
     "firebase-functions": "^5.0.1",
-    "resend": "^4.0.0"
+    "resend": "^4.0.0",
+    "stripe": "^16.12.0"
   },
   "devDependencies": {
     "@routizen/core": "*",
