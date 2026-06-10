@@ -67,8 +67,9 @@ npm run dev:web        # 웹앱 개발 서버 (http://localhost:3000)
   구독 Checkout 세션 URL 을 반환한다. 클라이언트는 그 url 로 리다이렉트한다.
 - **`stripeWebhook`** (HTTP) — Stripe 웹훅. 서명 검증 후 `checkout.session.completed` /
   `customer.subscription.*` 이벤트로 `users/{uid}` 의 `subscription`·`isPremium`·`stripeCustomerId`
-  를 갱신한다. `isPremium` 은 `subscription.status`(active/trialing → 프리미엄)에서 파생한다
-  (`@routizen/core` 의 `deriveIsPremium`).
+  를 갱신한다. `isPremium` 은 `subscription.status`(active 도메인 상태 → 프리미엄)에서 파생한다
+  (`@routizen/core` 의 `deriveIsPremium`). Stripe 상태 매핑은 active/trialing/past_due 를 프리미엄
+  유지로 보고(1회 결제 실패로 즉시 박탈하지 않음), unpaid/canceled/deleted 에서 회수한다.
 
 설정:
 

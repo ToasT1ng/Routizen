@@ -13,9 +13,15 @@ function stripe(): Stripe {
   return cachedStripe;
 }
 
-/** Stripe 구독 상태 → 도메인 상태. active/trialing 만 프리미엄, 그 외는 비활성. */
+/**
+ * Stripe 구독 상태 → 도메인 상태.
+ * active/trialing 은 물론, past_due 도 프리미엄 유지(결제 재시도 유예 기간 — 1회 실패로
+ * 즉시 박탈하지 않음). Stripe 가 최종적으로 unpaid/canceled/deleted 를 보내면 그때 회수한다.
+ */
 function mapStripeStatus(status: Stripe.Subscription.Status): SubscriptionInfo["status"] {
-  return status === "active" || status === "trialing" ? "active" : "canceled";
+  return status === "active" || status === "trialing" || status === "past_due"
+    ? "active"
+    : "canceled";
 }
 
 function customerIdOf(sub: Stripe.Subscription): string {
@@ -68,6 +74,11 @@ export const createCheckoutSession = onCall({ region: CONFIG.region }, async (re
   if (!snap.exists) throw new HttpsError("not-found", "사용자를 찾을 수 없습니다.");
   const user = { uid: snap.id, ...snap.data() } as User;
 
+  // 이미 활성 구독이면 중복 구독을 막는다(취소 후 재구독은 허용 — status 가 active 가 아님).
+  if (user.subscription?.status === "active") {
+    throw new HttpsError("already-exists", "이미 프리미엄 구독 중입니다.");
+  }
+
   // Stripe 고객 확보 — 없으면 생성하고 매핑 저장(웹훅 역조회에도 사용).
   let customerId = user.stripeCustomerId;
   if (!customerId) {
@@ -99,7 +110,8 @@ export const createCheckoutSession = onCall({ region: CONFIG.region }, async (re
  * raw body 가 필요하므로 req.rawBody 로 서명을 검증한다.
  */
 export const stripeWebhook = onRequest({ region: CONFIG.region }, async (req, res) => {
-  if (!CONFIG.stripeWebhookSecret) {
+  // 시크릿 키/웹훅 시크릿 둘 다 필요 — 미설정 시 fail-closed(서명 검증 실패로 오인되지 않도록 상단에서 가드).
+  if (!CONFIG.stripeSecretKey || !CONFIG.stripeWebhookSecret) {
     res.status(500).send("webhook not configured");
     return;
   }
