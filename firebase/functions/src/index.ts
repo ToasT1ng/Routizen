@@ -3,7 +3,8 @@ import "./firebaseAdmin.js"; // Admin SDK 초기화 (사이드이펙트)
 export { materializeDailyAlarms } from "./scheduler.js";
 export { onAlarmTask } from "./onAlarmTask.js";
 
-// 결제(billing) 웹훅은 결제 연동 단계에서 추가 — 기획 3.5 (초기 미연동)
+// 결제(billing) — Stripe 구독 Checkout + 웹훅 (기획 3.5)
+export { createCheckoutSession, stripeWebhook } from "./billing.js";
 
 // --- 로컬/에뮬레이터 테스트용 수동 트리거 -----------------------------------
 import { onRequest } from "firebase-functions/v2/https";

@@ -48,9 +48,11 @@ export interface User {
   email: string;
   displayName?: string;
   photoURL?: string;
-  /** 초기엔 항상 false (결제 미연동 — 기획 3.5) */
+  /** 구독 활성 여부 — subscription.status 에서 파생(deriveIsPremium). 결제 웹훅이 갱신 (기획 3.5) */
   isPremium: boolean;
   subscription: SubscriptionInfo;
+  /** Stripe 고객 ID — 결제 웹훅 이벤트를 사용자에 매핑. 미결제 사용자는 없음. */
+  stripeCustomerId?: string;
   /** 사용자 전역 알람 스타일 */
   alarmStyle: AlarmStyle;
   fcmTokens: FcmTokenEntry[];

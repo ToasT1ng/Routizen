@@ -38,7 +38,7 @@ npm run dev:web        # 웹앱 개발 서버 (http://localhost:3000)
 | FCM 푸시 발송 + 마지막 알람 이메일(Resend) | ✅ 서버 발송 `firebase/functions/notify.ts` |
 | 웹 FCM 푸시 수신(서비스워커·토큰 등록·포그라운드) | ✅ `apps/web/lib/messaging.ts` |
 | 맥앱(Tauri) | 🚧 스캐폴드 + 알림 브리지 `apps/desktop` (Rust 설치·코드서명 후 빌드) |
-| 결제 연동 | ⏳ 초기 미연동 — 안내 문구만 (기획 3.5) |
+| 결제 연동 | 🚧 백엔드 코어 ✅ Stripe 구독 Checkout+웹훅 `firebase/functions/billing.ts` (프리미엄 전환 UI 후속) |
 | iOS/Android(Capacitor) | ⏳ 추후 |
 
 ## Firebase 설정 / 배포
@@ -52,11 +52,36 @@ npm run dev:web        # 웹앱 개발 서버 (http://localhost:3000)
    - `ALARM_TASK_URL` (배포된 onAlarmTask URL), `TASK_INVOKER_SA`
    - `TASK_SECRET` (onAlarmTask 호출 검증용 공유 시크릿)
    - `RESEND_API_KEY`, `FROM_EMAIL`
+   - 결제(Stripe, 기획 3.5): `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, `APP_URL`
 6. 함수 런타임 타임존을 `Asia/Seoul` 로 설정(현재 KST 운영 가정)
 7. 배포:
    ```bash
    cd firebase && firebase deploy --only firestore:rules,firestore:indexes,functions
    ```
+
+### 결제 (Stripe 구독 — 기획 3.5)
+
+백엔드 결제 코어가 연동돼 있다(프리미엄 전환 UI 는 후속).
+
+- **`createCheckoutSession`** (callable) — 로그인 사용자가 호출하면 Stripe 고객을 확보하고
+  구독 Checkout 세션 URL 을 반환한다. 클라이언트는 그 url 로 리다이렉트한다.
+- **`stripeWebhook`** (HTTP) — Stripe 웹훅. 서명 검증 후 `checkout.session.completed` /
+  `customer.subscription.*` 이벤트로 `users/{uid}` 의 `subscription`·`isPremium`·`stripeCustomerId`
+  를 갱신한다. `isPremium` 은 `subscription.status`(active 도메인 상태 → 프리미엄)에서 파생한다
+  (`@routizen/core` 의 `deriveIsPremium`). Stripe 상태 매핑은 active/trialing/past_due 를 프리미엄
+  유지로 보고(1회 결제 실패로 즉시 박탈하지 않음), unpaid/canceled/deleted 에서 회수한다.
+
+설정:
+
+1. Stripe 대시보드에서 구독 상품/가격 생성 → `STRIPE_PRICE_ID`
+2. `STRIPE_SECRET_KEY` 설정
+3. 배포된 `stripeWebhook` URL 을 Stripe 웹훅 엔드포인트로 등록(이벤트: `checkout.session.completed`,
+   `customer.subscription.created/updated/deleted`) → 서명 시크릿을 `STRIPE_WEBHOOK_SECRET` 에 설정
+4. `APP_URL` 에 웹앱 주소 설정(Checkout 성공/취소 리다이렉트)
+
+> `isPremium`/`subscription` 은 Firestore 규칙상 클라이언트가 변경할 수 없고(서버 전용),
+> 오직 Admin SDK(웹훅)만 갱신한다. 에뮬레이터 검증은 Stripe CLI 의 `stripe listen --forward-to`
+> + `stripe trigger` 로 가능(실제 Stripe 키 필요).
 
 > 배포 시 `firebase/functions` 의 빌드(`predeploy`)는 esbuild 로 `src/index.ts` 를 단일 ESM
 > 번들(`dist/index.js`)로 묶는다. 워크스페이스 패키지 `@routizen/core` 는 번들에 인라인되고,
