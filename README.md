@@ -38,7 +38,7 @@ npm run dev:web        # 웹앱 개발 서버 (http://localhost:3000)
 | FCM 푸시 발송 + 마지막 알람 이메일(Resend) | ✅ 서버 발송 `firebase/functions/notify.ts` |
 | 웹 FCM 푸시 수신(서비스워커·토큰 등록·포그라운드) | ✅ `apps/web/lib/messaging.ts` |
 | 맥앱(Tauri) | 🚧 스캐폴드 + 알림 브리지 `apps/desktop` (Rust 설치·코드서명 후 빌드) |
-| 결제 연동 | 🚧 백엔드 코어 ✅ Stripe 구독 Checkout+웹훅 `firebase/functions/billing.ts` (프리미엄 전환 UI 후속) |
+| 결제 연동 | ✅ Stripe 구독 — 백엔드 코어(`firebase/functions/billing.ts`) + 웹 프리미엄 전환 UI(`apps/web/lib/billing.ts`, 추가 알람 슬롯 해제) |
 | iOS/Android(Capacitor) | ⏳ 추후 |
 
 ## Firebase 설정 / 배포
@@ -61,7 +61,9 @@ npm run dev:web        # 웹앱 개발 서버 (http://localhost:3000)
 
 ### 결제 (Stripe 구독 — 기획 3.5)
 
-백엔드 결제 코어가 연동돼 있다(프리미엄 전환 UI 는 후속).
+Stripe 구독 결제가 연동돼 있다. 웹 대시보드의 "프리미엄" 카드에서 업그레이드 →
+`createCheckoutSession` 콜러블이 반환한 Checkout URL 로 이동, 결제 완료 후 웹훅이 `isPremium`
+을 켜면 사용자 지정 추가 알람 슬롯(`ScheduleForm`)이 풀린다.
 
 - **`createCheckoutSession`** (callable) — 로그인 사용자가 호출하면 Stripe 고객을 확보하고
   구독 Checkout 세션 URL 을 반환한다. 클라이언트는 그 url 로 리다이렉트한다.

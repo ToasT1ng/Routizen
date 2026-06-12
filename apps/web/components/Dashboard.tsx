@@ -11,6 +11,7 @@ import {
 } from "@routizen/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { startPremiumCheckout } from "@/lib/billing";
 import { enablePush, isPushSupported, listenForegroundMessages } from "@/lib/messaging";
 import { createFirebaseRepositories } from "@/lib/repositories.firebase";
 import { ScheduleForm, type NewSchedule } from "./ScheduleForm";
@@ -67,6 +68,8 @@ export function Dashboard() {
   const [todayAlarms, setTodayAlarms] = useState<AlarmInstance[]>([]);
   const [loading, setLoading] = useState(true);
   const [pushStatus, setPushStatus] = useState<PushStatus>("checking");
+  const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const [billingMsg, setBillingMsg] = useState<string | null>(null);
 
   const uid = profile?.uid;
   const today = useMemo(() => toDateKey(new Date()), []);
@@ -122,6 +125,46 @@ export function Dashboard() {
       setPushStatus("error");
     }
   }, [uid, repos, refreshProfile]);
+
+  // Stripe Checkout 시작 — 성공 시 Stripe 로 리다이렉트되므로 아래는 실패 시에만 도달.
+  const handleUpgrade = useCallback(async () => {
+    setCheckoutBusy(true);
+    setBillingMsg(null);
+    const err = await startPremiumCheckout();
+    if (err) {
+      setCheckoutBusy(false);
+      setBillingMsg(
+        err === "already-premium"
+          ? "이미 프리미엄 구독 중이에요."
+          : err === "not-configured"
+            ? "결제가 아직 준비되지 않았어요. 잠시 후 다시 시도해 주세요."
+            : "결제 시작에 실패했어요. 잠시 후 다시 시도해 주세요.",
+      );
+    }
+  }, []);
+
+  // Checkout 복귀 처리(?checkout=success|cancel). isPremium 은 웹훅이 비동기로 갱신하므로
+  // 성공 시 잠시 폴링하며 프로필을 새로고침한다. URL 파라미터는 즉시 정리(반복 표시 방지).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const checkout = params.get("checkout");
+    if (!checkout) return;
+    window.history.replaceState({}, "", window.location.pathname);
+    if (checkout === "cancel") {
+      setBillingMsg("결제가 취소됐어요.");
+      return;
+    }
+    if (checkout === "success") {
+      setBillingMsg("결제가 완료됐어요! 프리미엄 적용까지 잠시 걸릴 수 있어요.");
+      let tries = 0;
+      const timer = setInterval(() => {
+        tries += 1;
+        void refreshProfile();
+        if (tries >= 5) clearInterval(timer);
+      }, 2000);
+      return () => clearInterval(timer);
+    }
+  }, [refreshProfile]);
 
   if (!profile) return null;
 
@@ -193,6 +236,33 @@ export function Dashboard() {
               </button>
             )}
           </div>
+        )}
+      </div>
+
+      {/* 프리미엄 구독 (Stripe — 기획 3.5) */}
+      <div className="card">
+        <h2>프리미엄</h2>
+        {profile.isPremium ? (
+          <p className="muted">
+            프리미엄 이용 중이에요 ✓
+            {profile.subscription?.currentPeriodEnd
+              ? ` · 다음 결제 ${new Date(
+                  profile.subscription.currentPeriodEnd,
+                ).toLocaleDateString("ko-KR")}`
+              : ""}
+          </p>
+        ) : (
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <span className="muted">일정 무제한 · 사용자 지정 추가 알람 슬롯을 풀 수 있어요.</span>
+            <button className="btn" disabled={checkoutBusy} onClick={() => void handleUpgrade()}>
+              {checkoutBusy ? "이동 중…" : "업그레이드"}
+            </button>
+          </div>
+        )}
+        {billingMsg && (
+          <p className="muted" style={{ marginTop: 8 }}>
+            {billingMsg}
+          </p>
         )}
       </div>
 
