@@ -140,8 +140,10 @@ export function Dashboard() {
             ? "결제가 아직 준비되지 않았어요. 잠시 후 다시 시도해 주세요."
             : "결제 시작에 실패했어요. 잠시 후 다시 시도해 주세요.",
       );
+      // 서버는 활성 구독이라 거절했는데 로컬 isPremium 이 stale 일 수 있으므로 동기화.
+      if (err === "already-premium") await refreshProfile();
     }
-  }, []);
+  }, [refreshProfile]);
 
   // Checkout 복귀 처리(?checkout=success|cancel). isPremium 은 웹훅이 비동기로 갱신하므로
   // 성공 시 잠시 폴링하며 프로필을 새로고침한다. URL 파라미터는 즉시 정리(반복 표시 방지).
