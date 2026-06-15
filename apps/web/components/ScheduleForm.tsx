@@ -22,11 +22,13 @@ export type NewSchedule = Omit<Schedule, "id" | "uid">;
 export function ScheduleForm({
   isPremium,
   disabled,
+  error,
   onCreate,
 }: {
   isPremium: boolean;
   disabled: boolean;
-  onCreate: (input: NewSchedule) => Promise<void>;
+  error?: string | null;
+  onCreate: (input: NewSchedule) => Promise<boolean>;
 }) {
   const [title, setTitle] = useState("");
   const [memo, setMemo] = useState("");
@@ -36,12 +38,21 @@ export function ScheduleForm({
   const [onceDate, setOnceDate] = useState("");
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("10:00");
+  const [extraAlarms, setExtraAlarms] = useState<string[]>([]);
+  const [newSlot, setNewSlot] = useState("12:00");
   const [submitting, setSubmitting] = useState(false);
 
   const toggleWeekday = (d: Weekday) =>
     setWeekdays((prev) =>
       prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort(),
     );
+
+  const addSlot = () => {
+    if (!newSlot) return;
+    setExtraAlarms((prev) => (prev.includes(newSlot) ? prev : [...prev, newSlot].sort()));
+  };
+  const removeSlot = (t: string) =>
+    setExtraAlarms((prev) => prev.filter((x) => x !== t));
 
   const buildRecurrence = (): Recurrence => {
     switch (type) {
@@ -66,17 +77,21 @@ export function ScheduleForm({
     if (!valid || disabled) return;
     setSubmitting(true);
     try {
-      await onCreate({
+      const ok = await onCreate({
         title: title.trim(),
         memo: memo.trim() || undefined,
         recurrence: buildRecurrence(),
         startTime,
         endTime,
-        extraAlarms: [],
+        // 추가 알람 슬롯은 프리미엄만 — 무료는 항상 빈 배열(Firestore 규칙도 동일하게 강제).
+        extraAlarms: isPremium ? extraAlarms : [],
         active: true,
       });
-      setTitle("");
-      setMemo("");
+      if (ok) {
+        setTitle("");
+        setMemo("");
+        setExtraAlarms([]);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -195,11 +210,44 @@ export function ScheduleForm({
         </div>
 
         {/* 추가 알람 슬롯 — 프리미엄 (기획 2.6) */}
-        {!isPremium && (
+        {isPremium ? (
+          <div>
+            <label>추가 알람 슬롯 (프리미엄)</label>
+            {extraAlarms.length > 0 && (
+              <div className="row" style={{ flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+                {extraAlarms.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    className="btn-ghost"
+                    style={{ padding: "6px 12px" }}
+                    onClick={() => removeSlot(t)}
+                  >
+                    {t} ✕
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="row">
+              <input
+                className="input"
+                type="time"
+                value={newSlot}
+                onChange={(e) => setNewSlot(e.target.value)}
+                style={{ flex: 1 }}
+              />
+              <button type="button" className="btn-ghost" onClick={addSlot}>
+                추가
+              </button>
+            </div>
+          </div>
+        ) : (
           <div className="locked">
             ⭐ 사용자 지정 추가 알람 슬롯은 {PREMIUM_LOCKED_MESSAGE}
           </div>
         )}
+
+        {error && <p style={{ color: "var(--danger)", fontSize: 12 }}>{error}</p>}
 
         <button className="btn" disabled={!valid || disabled || submitting} onClick={submit}>
           {submitting ? "등록 중…" : "등록"}

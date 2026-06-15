@@ -11,6 +11,7 @@ import {
 } from "@routizen/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { startPremiumCheckout } from "@/lib/billing";
 import { enablePush, isPushSupported, listenForegroundMessages } from "@/lib/messaging";
 import { createFirebaseRepositories } from "@/lib/repositories.firebase";
 import { ScheduleForm, type NewSchedule } from "./ScheduleForm";
@@ -67,6 +68,9 @@ export function Dashboard() {
   const [todayAlarms, setTodayAlarms] = useState<AlarmInstance[]>([]);
   const [loading, setLoading] = useState(true);
   const [pushStatus, setPushStatus] = useState<PushStatus>("checking");
+  const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const [billingMsg, setBillingMsg] = useState<string | null>(null);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
 
   const uid = profile?.uid;
   const today = useMemo(() => toDateKey(new Date()), []);
@@ -123,15 +127,75 @@ export function Dashboard() {
     }
   }, [uid, repos, refreshProfile]);
 
+  // Stripe Checkout 시작 — 성공 시 Stripe 로 리다이렉트되므로 아래는 실패 시에만 도달.
+  const handleUpgrade = useCallback(async () => {
+    setCheckoutBusy(true);
+    setBillingMsg(null);
+    const err = await startPremiumCheckout();
+    if (err) {
+      setCheckoutBusy(false);
+      setBillingMsg(
+        err === "already-premium"
+          ? "이미 프리미엄 구독 중이에요."
+          : err === "not-configured"
+            ? "결제가 아직 준비되지 않았어요. 잠시 후 다시 시도해 주세요."
+            : "결제 시작에 실패했어요. 잠시 후 다시 시도해 주세요.",
+      );
+      // 서버는 활성 구독이라 거절했는데 로컬 isPremium 이 stale 일 수 있으므로 동기화.
+      if (err === "already-premium") await refreshProfile();
+    }
+  }, [refreshProfile]);
+
+  // Checkout 복귀 처리(?checkout=success|cancel). isPremium 은 웹훅이 비동기로 갱신하므로
+  // 성공 시 잠시 폴링하며 프로필을 새로고침한다. URL 파라미터는 즉시 정리(반복 표시 방지).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const checkout = params.get("checkout");
+    if (!checkout) return;
+    window.history.replaceState({}, "", window.location.pathname);
+    if (checkout === "cancel") {
+      setBillingMsg("결제가 취소됐어요.");
+      return;
+    }
+    if (checkout === "success") {
+      setBillingMsg("결제가 완료됐어요! 프리미엄 적용까지 잠시 걸릴 수 있어요.");
+      let tries = 0;
+      const timer = setInterval(() => {
+        tries += 1;
+        void refreshProfile();
+        if (tries >= 5) clearInterval(timer);
+      }, 2000);
+      return () => clearInterval(timer);
+    }
+  }, [refreshProfile]);
+
   if (!profile) return null;
 
   const activeCount = schedules.length;
   const canCreate = canCreateSchedule(profile.isPremium, activeCount);
   const remaining = remainingFreeSlots(profile, activeCount);
 
-  const handleCreate = async (input: NewSchedule) => {
-    await repos.schedules.create({ ...input, uid: profile.uid });
-    await reload();
+  const handleCreate = async (input: NewSchedule): Promise<boolean> => {
+    try {
+      await repos.schedules.create({ ...input, uid: profile.uid });
+    } catch (err) {
+      const code = (err as { code?: string }).code ?? "";
+      if (code === "permission-denied" && input.extraAlarms.length > 0) {
+        // 추가 알람 슬롯 포함 저장이 거부됨 — 로컬 isPremium 이 서버와 어긋났을 가능성이 높으므로 동기화.
+        // best-effort: 동기화 자체가 실패해도 사용자에게는 아래 안내 메시지를 보여준다.
+        await refreshProfile().catch(() => {});
+        setScheduleError(
+          "추가 알람 슬롯을 포함해 저장하지 못했어요. 프리미엄 상태를 다시 확인한 뒤 다시 시도해 주세요.",
+        );
+      } else {
+        setScheduleError("일정 등록에 실패했어요. 잠시 후 다시 시도해 주세요.");
+      }
+      return false;
+    }
+    // 저장은 성공 — 목록 새로고침이 실패해도 저장 자체는 성공으로 처리한다.
+    setScheduleError(null);
+    await reload().catch(() => {});
+    return true;
   };
 
   const handleDelete = async (id: string) => {
@@ -196,6 +260,33 @@ export function Dashboard() {
         )}
       </div>
 
+      {/* 프리미엄 구독 (Stripe — 기획 3.5) */}
+      <div className="card">
+        <h2>프리미엄</h2>
+        {profile.isPremium ? (
+          <p className="muted">
+            프리미엄 이용 중이에요 ✓
+            {profile.subscription?.currentPeriodEnd
+              ? ` · 다음 결제 ${new Date(
+                  profile.subscription.currentPeriodEnd,
+                ).toLocaleDateString("ko-KR")}`
+              : ""}
+          </p>
+        ) : (
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <span className="muted">일정 무제한 · 사용자 지정 추가 알람 슬롯을 풀 수 있어요.</span>
+            <button className="btn" disabled={checkoutBusy} onClick={() => void handleUpgrade()}>
+              {checkoutBusy ? "이동 중…" : "업그레이드"}
+            </button>
+          </div>
+        )}
+        {billingMsg && (
+          <p className="muted" style={{ marginTop: 8 }}>
+            {billingMsg}
+          </p>
+        )}
+      </div>
+
       {/* 오늘의 알람 */}
       <div className="card">
         <h2>오늘의 루틴 ({today})</h2>
@@ -246,7 +337,12 @@ export function Dashboard() {
         )}
       </div>
 
-      <ScheduleForm isPremium={profile.isPremium} disabled={!canCreate} onCreate={handleCreate} />
+      <ScheduleForm
+        isPremium={profile.isPremium}
+        disabled={!canCreate}
+        error={scheduleError}
+        onCreate={handleCreate}
+      />
     </div>
   );
 }
