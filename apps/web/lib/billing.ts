@@ -3,8 +3,9 @@
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { getFirebaseApp } from "./firebase";
 
-// Functions 는 asia-northeast3 에 배포됨(알람 큐와 동일 리전 — firebase/functions/src/config.ts).
-const REGION = "asia-northeast3";
+// Functions 배포 리전(알람 큐와 동일 — firebase/functions/src/config.ts 의 FUNCTIONS_REGION 과
+// 일치해야 함). 기본값은 양쪽 다 asia-northeast3.
+const REGION = process.env.NEXT_PUBLIC_FUNCTIONS_REGION ?? "asia-northeast3";
 
 export type CheckoutError = "already-premium" | "not-configured" | "error";
 
