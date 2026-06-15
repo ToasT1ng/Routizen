@@ -70,6 +70,7 @@ export function Dashboard() {
   const [pushStatus, setPushStatus] = useState<PushStatus>("checking");
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [billingMsg, setBillingMsg] = useState<string | null>(null);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
 
   const uid = profile?.uid;
   const today = useMemo(() => toDateKey(new Date()), []);
@@ -174,9 +175,25 @@ export function Dashboard() {
   const canCreate = canCreateSchedule(profile.isPremium, activeCount);
   const remaining = remainingFreeSlots(profile, activeCount);
 
-  const handleCreate = async (input: NewSchedule) => {
-    await repos.schedules.create({ ...input, uid: profile.uid });
-    await reload();
+  const handleCreate = async (input: NewSchedule): Promise<boolean> => {
+    try {
+      await repos.schedules.create({ ...input, uid: profile.uid });
+      setScheduleError(null);
+      await reload();
+      return true;
+    } catch (err) {
+      const code = (err as { code?: string }).code ?? "";
+      if (code === "permission-denied" && input.extraAlarms.length > 0) {
+        // 추가 알람 슬롯 포함 저장이 거부됨 — 로컬 isPremium 이 서버와 어긋났을 가능성이 높으므로 동기화.
+        await refreshProfile();
+        setScheduleError(
+          "추가 알람 슬롯을 포함해 저장하지 못했어요. 프리미엄 상태를 다시 확인한 뒤 다시 시도해 주세요.",
+        );
+      } else {
+        setScheduleError("일정 등록에 실패했어요. 잠시 후 다시 시도해 주세요.");
+      }
+      return false;
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -318,7 +335,12 @@ export function Dashboard() {
         )}
       </div>
 
-      <ScheduleForm isPremium={profile.isPremium} disabled={!canCreate} onCreate={handleCreate} />
+      <ScheduleForm
+        isPremium={profile.isPremium}
+        disabled={!canCreate}
+        error={scheduleError}
+        onCreate={handleCreate}
+      />
     </div>
   );
 }

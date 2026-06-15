@@ -22,11 +22,13 @@ export type NewSchedule = Omit<Schedule, "id" | "uid">;
 export function ScheduleForm({
   isPremium,
   disabled,
+  error,
   onCreate,
 }: {
   isPremium: boolean;
   disabled: boolean;
-  onCreate: (input: NewSchedule) => Promise<void>;
+  error?: string | null;
+  onCreate: (input: NewSchedule) => Promise<boolean>;
 }) {
   const [title, setTitle] = useState("");
   const [memo, setMemo] = useState("");
@@ -45,8 +47,10 @@ export function ScheduleForm({
       prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort(),
     );
 
-  const addSlot = () =>
+  const addSlot = () => {
+    if (!newSlot) return;
     setExtraAlarms((prev) => (prev.includes(newSlot) ? prev : [...prev, newSlot].sort()));
+  };
   const removeSlot = (t: string) =>
     setExtraAlarms((prev) => prev.filter((x) => x !== t));
 
@@ -73,7 +77,7 @@ export function ScheduleForm({
     if (!valid || disabled) return;
     setSubmitting(true);
     try {
-      await onCreate({
+      const ok = await onCreate({
         title: title.trim(),
         memo: memo.trim() || undefined,
         recurrence: buildRecurrence(),
@@ -83,9 +87,11 @@ export function ScheduleForm({
         extraAlarms: isPremium ? extraAlarms : [],
         active: true,
       });
-      setTitle("");
-      setMemo("");
-      setExtraAlarms([]);
+      if (ok) {
+        setTitle("");
+        setMemo("");
+        setExtraAlarms([]);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -240,6 +246,8 @@ export function ScheduleForm({
             ⭐ 사용자 지정 추가 알람 슬롯은 {PREMIUM_LOCKED_MESSAGE}
           </div>
         )}
+
+        {error && <p style={{ color: "var(--danger)", fontSize: 12 }}>{error}</p>}
 
         <button className="btn" disabled={!valid || disabled || submitting} onClick={submit}>
           {submitting ? "등록 중…" : "등록"}
