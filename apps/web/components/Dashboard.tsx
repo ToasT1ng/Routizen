@@ -178,14 +178,12 @@ export function Dashboard() {
   const handleCreate = async (input: NewSchedule): Promise<boolean> => {
     try {
       await repos.schedules.create({ ...input, uid: profile.uid });
-      setScheduleError(null);
-      await reload();
-      return true;
     } catch (err) {
       const code = (err as { code?: string }).code ?? "";
       if (code === "permission-denied" && input.extraAlarms.length > 0) {
         // 추가 알람 슬롯 포함 저장이 거부됨 — 로컬 isPremium 이 서버와 어긋났을 가능성이 높으므로 동기화.
-        await refreshProfile();
+        // best-effort: 동기화 자체가 실패해도 사용자에게는 아래 안내 메시지를 보여준다.
+        await refreshProfile().catch(() => {});
         setScheduleError(
           "추가 알람 슬롯을 포함해 저장하지 못했어요. 프리미엄 상태를 다시 확인한 뒤 다시 시도해 주세요.",
         );
@@ -194,6 +192,10 @@ export function Dashboard() {
       }
       return false;
     }
+    // 저장은 성공 — 목록 새로고침이 실패해도 저장 자체는 성공으로 처리한다.
+    setScheduleError(null);
+    await reload().catch(() => {});
+    return true;
   };
 
   const handleDelete = async (id: string) => {
