@@ -9,7 +9,7 @@ import {
   type Recurrence,
   type Schedule,
 } from "@routizen/core";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { startPremiumCheckout } from "@/lib/billing";
 import { enablePush, isPushSupported, listenForegroundMessages } from "@/lib/messaging";
@@ -127,24 +127,61 @@ export function Dashboard() {
     }
   }, [uid, repos, refreshProfile]);
 
-  // Stripe Checkout 시작 — 성공 시 Stripe 로 리다이렉트되므로 아래는 실패 시에만 도달.
+  // 외부 브라우저 Checkout 복귀 감지용 포커스 핸들러 참조(정리 시 사용).
+  const externalFocusHandlerRef = useRef<(() => void) | null>(null);
+
+  // Stripe Checkout 시작.
+  // 브라우저: Stripe 로 리다이렉트 → 이후 반환 없음.
+  // Tauri 맥앱: 기본 브라우저로 열고 "external" 반환 → 앱 포커스 복귀 시 프리미엄 상태 폴링.
   const handleUpgrade = useCallback(async () => {
     setCheckoutBusy(true);
     setBillingMsg(null);
-    const err = await startPremiumCheckout();
-    if (err) {
+    const result = await startPremiumCheckout();
+
+    if (result === "external") {
+      // 외부 브라우저에서 결제 진행 중 — 앱 포커스 복귀 시 isPremium 을 폴링한다.
+      setCheckoutBusy(false);
+      setBillingMsg("기본 브라우저에서 결제를 완료한 뒤 이 앱으로 돌아오세요.");
+      const handler = () => {
+        externalFocusHandlerRef.current = null;
+        window.removeEventListener("focus", handler);
+        setBillingMsg("결제 완료 여부를 확인하는 중…");
+        let tries = 0;
+        const timer = setInterval(() => {
+          tries += 1;
+          void refreshProfile().catch(() => {});
+          if (tries >= 5) {
+            clearInterval(timer);
+            setBillingMsg(null);
+          }
+        }, 2000);
+      };
+      externalFocusHandlerRef.current = handler;
+      window.addEventListener("focus", handler);
+      return;
+    }
+
+    if (result) {
       setCheckoutBusy(false);
       setBillingMsg(
-        err === "already-premium"
+        result === "already-premium"
           ? "이미 프리미엄 구독 중이에요."
-          : err === "not-configured"
+          : result === "not-configured"
             ? "결제가 아직 준비되지 않았어요. 잠시 후 다시 시도해 주세요."
             : "결제 시작에 실패했어요. 잠시 후 다시 시도해 주세요.",
       );
       // 서버는 활성 구독이라 거절했는데 로컬 isPremium 이 stale 일 수 있으므로 동기화.
-      if (err === "already-premium") await refreshProfile();
+      if (result === "already-premium") await refreshProfile().catch(() => {});
     }
   }, [refreshProfile]);
+
+  // 언마운트 시 외부 Checkout 포커스 리스너를 정리한다(방어적).
+  useEffect(() => {
+    return () => {
+      const handler = externalFocusHandlerRef.current;
+      if (handler) window.removeEventListener("focus", handler);
+    };
+  }, []);
 
   // Checkout 복귀 처리(?checkout=success|cancel). isPremium 은 웹훅이 비동기로 갱신하므로
   // 성공 시 잠시 폴링하며 프로필을 새로고침한다. URL 파라미터는 즉시 정리(반복 표시 방지).
