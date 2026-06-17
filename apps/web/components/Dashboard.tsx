@@ -76,6 +76,11 @@ export function Dashboard() {
   useEffect(() => {
     isPremiumRef.current = profile?.isPremium ?? false;
   }, [profile]);
+  // isPremium 이 true 로 전환되면 결제 관련 billingMsg 를 자동으로 지운다.
+  // 폴링 마지막 tick 의 타이밍 경쟁으로 오류 메시지가 남는 경우를 방지한다.
+  useEffect(() => {
+    if (profile?.isPremium) setBillingMsg(null);
+  }, [profile?.isPremium]);
 
   const uid = profile?.uid;
   const today = useMemo(() => toDateKey(new Date()), []);
