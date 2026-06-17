@@ -71,6 +71,11 @@ export function Dashboard() {
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [billingMsg, setBillingMsg] = useState<string | null>(null);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
+  // 폴링 콜백 안에서 최신 isPremium 을 읽기 위한 ref(stale closure 방지).
+  const isPremiumRef = useRef(false);
+  useEffect(() => {
+    isPremiumRef.current = profile?.isPremium ?? false;
+  }, [profile]);
 
   const uid = profile?.uid;
   const today = useMemo(() => toDateKey(new Date()), []);
@@ -139,20 +144,28 @@ export function Dashboard() {
     const result = await startPremiumCheckout();
 
     if (result === "external") {
-      // 외부 브라우저에서 결제 진행 중 — 앱 포커스 복귀 시 isPremium 을 폴링한다.
-      setCheckoutBusy(false);
+      // 기본 브라우저로 Checkout 이 열렸음.
+      // checkoutBusy 는 true 유지 → 앱 포커스 복귀 전까지 버튼 비활성(이중 클릭 방지).
       setBillingMsg("기본 브라우저에서 결제를 완료한 뒤 이 앱으로 돌아오세요.");
+      // 혹시 이전 핸들러가 남아 있으면 선제 제거.
+      const existing = externalFocusHandlerRef.current;
+      if (existing) window.removeEventListener("focus", existing);
       const handler = () => {
         externalFocusHandlerRef.current = null;
         window.removeEventListener("focus", handler);
+        setCheckoutBusy(false);
         setBillingMsg("결제 완료 여부를 확인하는 중…");
         let tries = 0;
         const timer = setInterval(() => {
           tries += 1;
           void refreshProfile().catch(() => {});
-          if (tries >= 5) {
+          if (tries >= 5 || isPremiumRef.current) {
             clearInterval(timer);
-            setBillingMsg(null);
+            setBillingMsg(
+              isPremiumRef.current
+                ? null
+                : "결제가 아직 반영되지 않았어요. 잠시 후 앱을 재시작해 다시 확인해 주세요.",
+            );
           }
         }, 2000);
       };
@@ -199,7 +212,7 @@ export function Dashboard() {
       let tries = 0;
       const timer = setInterval(() => {
         tries += 1;
-        void refreshProfile();
+        void refreshProfile().catch(() => {});
         if (tries >= 5) clearInterval(timer);
       }, 2000);
       return () => clearInterval(timer);
