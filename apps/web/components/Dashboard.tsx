@@ -163,15 +163,16 @@ export function Dashboard() {
         let tries = 0;
         const timer = setInterval(() => {
           tries += 1;
-          void refreshProfile().catch(() => {});
-          if (tries >= 5 || isPremiumRef.current) {
-            clearInterval(timer);
-            setBillingMsg(
-              isPremiumRef.current
-                ? null
-                : "결제가 아직 반영되지 않았어요. 잠시 후 앱을 재시작해 다시 확인해 주세요.",
-            );
-          }
+          void refreshProfile().catch(() => {}).then(() => {
+            if (tries >= 5 || isPremiumRef.current) {
+              clearInterval(timer);
+              setBillingMsg(
+                isPremiumRef.current
+                  ? null
+                  : "결제가 아직 반영되지 않았어요. 잠시 후 앱을 재시작해 다시 확인해 주세요.",
+              );
+            }
+          });
         }, 2000);
       };
       externalFocusHandlerRef.current = handler;
@@ -217,8 +218,9 @@ export function Dashboard() {
       let tries = 0;
       const timer = setInterval(() => {
         tries += 1;
-        void refreshProfile().catch(() => {});
-        if (tries >= 5) clearInterval(timer);
+        void refreshProfile().catch(() => {}).then(() => {
+          if (tries >= 5 || isPremiumRef.current) clearInterval(timer);
+        });
       }, 2000);
       return () => clearInterval(timer);
     }
