@@ -10,6 +10,8 @@ pub fn run() {
         // OS 로컬 알림 — WKWebView 가 웹푸시를 지원하지 않으므로(기획 3.2),
         // 웹 번들이 Firestore notifications 문서를 구독해 이 플러그인으로 알림을 띄운다.
         .plugin(tauri_plugin_notification::init())
+        // 외부 브라우저 열기 — Stripe Checkout 을 Webview 밖에서 실행하기 위해 사용(기획 3.5).
+        .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             // 메뉴바(트레이) 상주 — 창을 닫아도 백그라운드 웹뷰가 살아있어
             // Firestore 리스너가 계속 알림을 받는다(아래 close 핸들러 참고).
