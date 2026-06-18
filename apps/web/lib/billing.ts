@@ -20,13 +20,10 @@ function isTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
-/**
- * Tauri 환경에서 URL 을 기본 브라우저로 엽니다.
- * tauri-plugin-shell 의 shell:allow-open 권한이 필요합니다.
- */
+/** Tauri 환경에서 URL 을 기본 브라우저로 엽니다(tauri-plugin-shell 공식 API 사용). */
 async function openInBrowser(url: string): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (window as any).__TAURI_INTERNALS__.invoke("plugin:shell|open", { path: url });
+  const { open } = await import("@tauri-apps/plugin-shell");
+  await open(url);
 }
 
 /**
