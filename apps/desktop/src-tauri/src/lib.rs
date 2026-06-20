@@ -3,6 +3,7 @@ use tauri::{
     tray::TrayIconBuilder,
     Manager, WindowEvent,
 };
+use tauri_plugin_deep_link::DeepLinkExt;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -12,7 +13,17 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         // 외부 브라우저 열기 — Stripe Checkout 을 Webview 밖에서 실행하기 위해 사용(기획 3.5).
         .plugin(tauri_plugin_shell::init())
+        // 커스텀 URL 스킴 — routizen://checkout/success 수신 시 webview 에 checkout-complete 이벤트 전달.
+        .plugin(tauri_plugin_deep_link::init())
         .setup(|app| {
+            let handle = app.handle().clone();
+            app.deep_link().on_open_urls(move |event| {
+                for url in event.urls() {
+                    if url.scheme() == "routizen" {
+                        let _ = handle.emit("checkout-complete", ());
+                    }
+                }
+            });
             // 메뉴바(트레이) 상주 — 창을 닫아도 백그라운드 웹뷰가 살아있어
             // Firestore 리스너가 계속 알림을 받는다(아래 close 핸들러 참고).
             let show = MenuItem::with_id(app, "show", "Routizen 열기", true, None::<&str>)?;
