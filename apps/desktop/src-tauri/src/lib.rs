@@ -23,7 +23,7 @@ pub fn run() {
                         let _ = handle.emit("checkout-complete", ());
                     }
                 }
-            });
+            })?;
             // 메뉴바(트레이) 상주 — 창을 닫아도 백그라운드 웹뷰가 살아있어
             // Firestore 리스너가 계속 알림을 받는다(아래 close 핸들러 참고).
             let show = MenuItem::with_id(app, "show", "Routizen 열기", true, None::<&str>)?;

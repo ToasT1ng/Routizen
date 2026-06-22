@@ -206,9 +206,11 @@ export function Dashboard() {
   // 프로필을 즉시 갱신한다. 포커스 폴링보다 빠르고 신뢰도 높은 경로.
   useEffect(() => {
     if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return;
+    let mounted = true;
     let unlisten: (() => void) | undefined;
     void (async () => {
       const { listen } = await import("@tauri-apps/api/event");
+      if (!mounted) return;
       unlisten = await listen("checkout-complete", () => {
         const handler = externalFocusHandlerRef.current;
         if (handler) {
@@ -217,10 +219,20 @@ export function Dashboard() {
         }
         setCheckoutBusy(false);
         setBillingMsg("결제 완료 여부를 확인하는 중…");
-        void refreshProfile().catch(() => {});
+        // 웹훅이 아직 처리 중일 수 있으므로 2초 간격 3회 재시도.
+        let tries = 0;
+        const timer = setInterval(() => {
+          tries += 1;
+          void refreshProfile().catch(() => {}).then(() => {
+            if (tries >= 3 || isPremiumRef.current) clearInterval(timer);
+          });
+        }, 2000);
       });
     })();
-    return () => unlisten?.();
+    return () => {
+      mounted = false;
+      unlisten?.();
+    };
   }, [refreshProfile]);
 
   // Checkout 복귀 처리(?checkout=success|cancel). isPremium 은 웹훅이 비동기로 갱신하므로
@@ -236,8 +248,9 @@ export function Dashboard() {
     }
     if (checkout === "success") {
       setBillingMsg("결제가 완료됐어요! 프리미엄 적용까지 잠시 걸릴 수 있어요.");
-      // Tauri 앱이 설치돼 있으면 딥링크로 즉시 신호 전달(앱이 없으면 no-op).
-      window.location.href = "routizen://checkout/success";
+      // Tauri 앱이 설치돼 있으면 딥링크로 즉시 신호 전달.
+      // window.open 사용 — location.href 는 현재 페이지를 이동시켜 폴링을 소멸시킴.
+      window.open("routizen://checkout/success", "_blank");
       // 폴링(딥링크 미지원 환경 폴백 — 웹 브라우저 또는 딥링크 실패 시).
       let tries = 0;
       const timer = setInterval(() => {
