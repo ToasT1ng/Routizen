@@ -41,6 +41,11 @@
     }
   },
   "plugins": {
-    "notification": {}
+    "notification": {},
+    "deep-link": {
+      "desktop": {
+        "schemes": ["routizen"]
+      }
+    }
   }
 }
