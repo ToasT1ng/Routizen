@@ -113,6 +113,29 @@ button {
   font-size: 13px;
 }
 
+.card--alert {
+  border-color: var(--accent);
+}
+
+.slot-bar {
+  height: 4px;
+  background: var(--surface-2);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+
+.slot-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.slot-bar-fill--warn {
+  background: var(--danger);
+}
+
 .center-screen {
   min-height: 100vh;
   display: grid;
