@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  FREE_SCHEDULE_LIMIT,
   canCreateSchedule,
   remainingFreeSlots,
   toDateKey,
@@ -355,7 +356,7 @@ export function Dashboard() {
       </div>
 
       {/* 프리미엄 구독 (Stripe — 기획 3.5) */}
-      <div className="card">
+      <div className={`card${!profile.isPremium && !canCreate ? " card--alert" : ""}`}>
         <h2>프리미엄</h2>
         {profile.isPremium ? (
           <p className="muted">
@@ -409,7 +410,22 @@ export function Dashboard() {
 
       {/* 일정 목록 */}
       <div className="card">
-        <h2>내 일정 ({activeCount})</h2>
+        <div className="row" style={{ justifyContent: "space-between", marginBottom: 12 }}>
+          <h2 style={{ margin: 0 }}>내 일정</h2>
+          {!profile.isPremium && (
+            <span className="muted" style={{ fontSize: 12 }}>
+              {activeCount} / {FREE_SCHEDULE_LIMIT}
+            </span>
+          )}
+        </div>
+        {!profile.isPremium && (
+          <div className="slot-bar">
+            <div
+              className={`slot-bar-fill${remaining === 0 ? " slot-bar-fill--warn" : ""}`}
+              style={{ width: `${Math.min((activeCount / FREE_SCHEDULE_LIMIT) * 100, 100)}%` }}
+            />
+          </div>
+        )}
         {schedules.length === 0 ? (
           <p className="muted">아직 등록한 일정이 없어요.</p>
         ) : (
@@ -436,6 +452,7 @@ export function Dashboard() {
         disabled={!canCreate}
         error={scheduleError}
         onCreate={handleCreate}
+        onUpgrade={profile.isPremium ? undefined : () => void handleUpgrade()}
       />
     </div>
   );

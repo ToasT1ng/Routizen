@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  PREMIUM_LOCKED_MESSAGE,
   type MonthlyPart,
   type Recurrence,
   type RecurrenceType,
@@ -24,11 +23,13 @@ export function ScheduleForm({
   disabled,
   error,
   onCreate,
+  onUpgrade,
 }: {
   isPremium: boolean;
   disabled: boolean;
   error?: string | null;
   onCreate: (input: NewSchedule) => Promise<boolean>;
+  onUpgrade?: () => void;
 }) {
   const [title, setTitle] = useState("");
   const [memo, setMemo] = useState("");
@@ -103,7 +104,14 @@ export function ScheduleForm({
 
       {disabled && (
         <div className="locked" style={{ marginBottom: 14 }}>
-          무료 일정 한도(10개)에 도달했어요. 일정 무제한은 {PREMIUM_LOCKED_MESSAGE}
+          <div className="row" style={{ justifyContent: "space-between", gap: 12 }}>
+            <span>일정 한도(10개)에 도달했어요. 프리미엄으로 업그레이드하면 무제한으로 등록할 수 있어요.</span>
+            {onUpgrade && (
+              <button className="btn" style={{ whiteSpace: "nowrap", flexShrink: 0 }} onClick={onUpgrade}>
+                업그레이드
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -243,7 +251,14 @@ export function ScheduleForm({
           </div>
         ) : (
           <div className="locked">
-            ⭐ 사용자 지정 추가 알람 슬롯은 {PREMIUM_LOCKED_MESSAGE}
+            <div className="row" style={{ justifyContent: "space-between", gap: 12 }}>
+              <span>⭐ 추가 알람 슬롯은 프리미엄 기능이에요.</span>
+              {onUpgrade && (
+                <button className="btn" style={{ whiteSpace: "nowrap", flexShrink: 0 }} onClick={onUpgrade}>
+                  업그레이드
+                </button>
+              )}
+            </div>
           </div>
         )}
 
