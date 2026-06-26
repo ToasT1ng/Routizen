@@ -106,7 +106,9 @@ export function ScheduleForm({
         extraAlarms: isPremium ? extraAlarms : [],
         active: initialSchedule?.active ?? true,
       };
-      const ok = isEditing ? await onUpdate!(input) : await onCreate!(input);
+      const handler = isEditing ? onUpdate : onCreate;
+      if (!handler) return;
+      const ok = await handler(input);
       if (ok && !isEditing) {
         setTitle("");
         setMemo("");

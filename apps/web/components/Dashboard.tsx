@@ -270,6 +270,8 @@ export function Dashboard() {
   const activeCount = schedules.length;
   const canCreate = canCreateSchedule(profile.isPremium, activeCount);
   const remaining = remainingFreeSlots(profile, activeCount);
+  // editingId 가 가리키는 일정이 목록에서 사라졌을 때(리로드 타이밍 등) null 로 폴백.
+  const editingSchedule = editingId ? (schedules.find((s) => s.id === editingId) ?? null) : null;
 
   const handleCreate = async (input: NewSchedule): Promise<boolean> => {
     try {
@@ -481,14 +483,14 @@ export function Dashboard() {
         )}
       </div>
 
-      {editingId ? (
+      {editingSchedule ? (
         <ScheduleForm
-          key={editingId}
+          key={editingSchedule.id}
           isPremium={profile.isPremium}
           disabled={false}
           error={scheduleError}
-          initialSchedule={schedules.find((s) => s.id === editingId)}
-          onUpdate={(patch) => handleUpdate(editingId, patch)}
+          initialSchedule={editingSchedule}
+          onUpdate={(patch) => handleUpdate(editingSchedule.id, patch)}
           onCancel={() => { setEditingId(null); setScheduleError(null); }}
           onUpgrade={profile.isPremium ? undefined : () => void handleUpgrade()}
         />
