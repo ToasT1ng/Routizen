@@ -23,23 +23,41 @@ export function ScheduleForm({
   disabled,
   error,
   onCreate,
+  onUpdate,
+  onCancel,
   onUpgrade,
+  initialSchedule,
 }: {
   isPremium: boolean;
   disabled: boolean;
   error?: string | null;
-  onCreate: (input: NewSchedule) => Promise<boolean>;
+  onCreate?: (input: NewSchedule) => Promise<boolean>;
+  onUpdate?: (patch: NewSchedule) => Promise<boolean>;
+  onCancel?: () => void;
   onUpgrade?: () => void;
+  initialSchedule?: Schedule;
 }) {
-  const [title, setTitle] = useState("");
-  const [memo, setMemo] = useState("");
-  const [type, setType] = useState<RecurrenceType>("daily");
-  const [weekdays, setWeekdays] = useState<Weekday[]>([1, 2, 3, 4, 5]);
-  const [monthlyPart, setMonthlyPart] = useState<MonthlyPart>("early");
-  const [onceDate, setOnceDate] = useState("");
-  const [startTime, setStartTime] = useState("09:00");
-  const [endTime, setEndTime] = useState("10:00");
-  const [extraAlarms, setExtraAlarms] = useState<string[]>([]);
+  const isEditing = !!initialSchedule;
+
+  const [title, setTitle] = useState(initialSchedule?.title ?? "");
+  const [memo, setMemo] = useState(initialSchedule?.memo ?? "");
+  const [type, setType] = useState<RecurrenceType>(initialSchedule?.recurrence.type ?? "daily");
+  const [weekdays, setWeekdays] = useState<Weekday[]>(
+    initialSchedule?.recurrence.type === "weekly"
+      ? (initialSchedule.recurrence.weekdays ?? [1, 2, 3, 4, 5])
+      : [1, 2, 3, 4, 5],
+  );
+  const [monthlyPart, setMonthlyPart] = useState<MonthlyPart>(
+    initialSchedule?.recurrence.type === "monthly"
+      ? (initialSchedule.recurrence.monthlyPart ?? "early")
+      : "early",
+  );
+  const [onceDate, setOnceDate] = useState(
+    initialSchedule?.recurrence.type === "once" ? (initialSchedule.recurrence.date ?? "") : "",
+  );
+  const [startTime, setStartTime] = useState(initialSchedule?.startTime ?? "09:00");
+  const [endTime, setEndTime] = useState(initialSchedule?.endTime ?? "10:00");
+  const [extraAlarms, setExtraAlarms] = useState<string[]>(initialSchedule?.extraAlarms ?? []);
   const [newSlot, setNewSlot] = useState("12:00");
   const [submitting, setSubmitting] = useState(false);
 
@@ -75,10 +93,10 @@ export function ScheduleForm({
     (type !== "weekly" || weekdays.length > 0);
 
   const submit = async () => {
-    if (!valid || disabled) return;
+    if (!valid || (!isEditing && disabled)) return;
     setSubmitting(true);
     try {
-      const ok = await onCreate({
+      const input: NewSchedule = {
         title: title.trim(),
         memo: memo.trim() || undefined,
         recurrence: buildRecurrence(),
@@ -86,9 +104,10 @@ export function ScheduleForm({
         endTime,
         // 추가 알람 슬롯은 프리미엄만 — 무료는 항상 빈 배열(Firestore 규칙도 동일하게 강제).
         extraAlarms: isPremium ? extraAlarms : [],
-        active: true,
-      });
-      if (ok) {
+        active: initialSchedule?.active ?? true,
+      };
+      const ok = isEditing ? await onUpdate!(input) : await onCreate!(input);
+      if (ok && !isEditing) {
         setTitle("");
         setMemo("");
         setExtraAlarms([]);
@@ -100,9 +119,16 @@ export function ScheduleForm({
 
   return (
     <div className="card">
-      <h2>새 일정 등록</h2>
+      <div className="row" style={{ justifyContent: "space-between", marginBottom: 12 }}>
+        <h2 style={{ margin: 0 }}>{isEditing ? "일정 편집" : "새 일정 등록"}</h2>
+        {isEditing && onCancel && (
+          <button className="btn-ghost" onClick={onCancel}>
+            취소
+          </button>
+        )}
+      </div>
 
-      {disabled && (
+      {!isEditing && disabled && (
         <div className="locked" style={{ marginBottom: 14 }}>
           <div className="row" style={{ justifyContent: "space-between", gap: 12 }}>
             <span>일정 한도(10개)에 도달했어요. 프리미엄으로 업그레이드하면 무제한으로 등록할 수 있어요.</span>
@@ -264,8 +290,12 @@ export function ScheduleForm({
 
         {error && <p style={{ color: "var(--danger)", fontSize: 12 }}>{error}</p>}
 
-        <button className="btn" disabled={!valid || disabled || submitting} onClick={submit}>
-          {submitting ? "등록 중…" : "등록"}
+        <button
+          className="btn"
+          disabled={!valid || (!isEditing && disabled) || submitting}
+          onClick={submit}
+        >
+          {submitting ? (isEditing ? "저장 중…" : "등록 중…") : isEditing ? "저장" : "등록"}
         </button>
       </div>
     </div>

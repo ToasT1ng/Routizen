@@ -72,6 +72,7 @@ export function Dashboard() {
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [billingMsg, setBillingMsg] = useState<string | null>(null);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   // 폴링 콜백 안에서 최신 isPremium 을 읽기 위한 ref(stale closure 방지).
   const isPremiumRef = useRef(false);
   useEffect(() => {
@@ -293,7 +294,29 @@ export function Dashboard() {
     return true;
   };
 
+  const handleUpdate = async (id: string, patch: NewSchedule): Promise<boolean> => {
+    try {
+      await repos.schedules.update(id, patch);
+    } catch (err) {
+      const code = (err as { code?: string }).code ?? "";
+      if (code === "permission-denied" && patch.extraAlarms.length > 0) {
+        await refreshProfile().catch(() => {});
+        setScheduleError(
+          "추가 알람 슬롯을 포함해 저장하지 못했어요. 프리미엄 상태를 다시 확인한 뒤 다시 시도해 주세요.",
+        );
+      } else {
+        setScheduleError("일정 수정에 실패했어요. 잠시 후 다시 시도해 주세요.");
+      }
+      return false;
+    }
+    setScheduleError(null);
+    setEditingId(null);
+    await reload().catch(() => {});
+    return true;
+  };
+
   const handleDelete = async (id: string) => {
+    if (editingId === id) setEditingId(null);
     await repos.schedules.remove(id);
     await reload();
   };
@@ -438,22 +461,47 @@ export function Dashboard() {
                     {describeRecurrence(s.recurrence)} · {s.startTime}–{s.endTime}
                   </span>
                 </div>
-                <button className="btn-ghost" onClick={() => void handleDelete(s.id)}>
-                  삭제
-                </button>
+                <div className="row">
+                  <button
+                    className={editingId === s.id ? "btn" : "btn-ghost"}
+                    onClick={() => {
+                      setScheduleError(null);
+                      setEditingId((prev) => (prev === s.id ? null : s.id));
+                    }}
+                  >
+                    편집
+                  </button>
+                  <button className="btn-ghost" onClick={() => void handleDelete(s.id)}>
+                    삭제
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      <ScheduleForm
-        isPremium={profile.isPremium}
-        disabled={!canCreate}
-        error={scheduleError}
-        onCreate={handleCreate}
-        onUpgrade={profile.isPremium ? undefined : () => void handleUpgrade()}
-      />
+      {editingId ? (
+        <ScheduleForm
+          key={editingId}
+          isPremium={profile.isPremium}
+          disabled={false}
+          error={scheduleError}
+          initialSchedule={schedules.find((s) => s.id === editingId)}
+          onUpdate={(patch) => handleUpdate(editingId, patch)}
+          onCancel={() => { setEditingId(null); setScheduleError(null); }}
+          onUpgrade={profile.isPremium ? undefined : () => void handleUpgrade()}
+        />
+      ) : (
+        <ScheduleForm
+          key="new"
+          isPremium={profile.isPremium}
+          disabled={!canCreate}
+          error={scheduleError}
+          onCreate={handleCreate}
+          onUpgrade={profile.isPremium ? undefined : () => void handleUpgrade()}
+        />
+      )}
     </div>
   );
 }
