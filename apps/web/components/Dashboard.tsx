@@ -15,6 +15,7 @@ import { useAuth } from "@/lib/auth";
 import { startPremiumCheckout } from "@/lib/billing";
 import { enablePush, isPushSupported, listenForegroundMessages } from "@/lib/messaging";
 import { createFirebaseRepositories } from "@/lib/repositories.firebase";
+import { HistoryView } from "./HistoryView";
 import { ScheduleForm, type NewSchedule } from "./ScheduleForm";
 
 type PushStatus =
@@ -73,6 +74,7 @@ export function Dashboard() {
   const [billingMsg, setBillingMsg] = useState<string | null>(null);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
   // 폴링 콜백 안에서 최신 isPremium 을 읽기 위한 ref(stale closure 방지).
   const isPremiumRef = useRef(false);
   useEffect(() => {
@@ -269,6 +271,7 @@ export function Dashboard() {
 
   const activeCount = schedules.length;
   const canCreate = canCreateSchedule(profile.isPremium, activeCount);
+  const scheduleMap = useMemo(() => new Map(schedules.map((s) => [s.id, s])), [schedules]);
   const remaining = remainingFreeSlots(profile, activeCount);
   // editingId 가 가리키는 일정이 목록에서 사라졌을 때(리로드 타이밍 등) null 로 폴백.
   const editingSchedule = editingId ? (schedules.find((s) => s.id === editingId) ?? null) : null;
@@ -407,10 +410,28 @@ export function Dashboard() {
         )}
       </div>
 
-      {/* 오늘의 알람 */}
+      {/* 오늘의 루틴 / 실행 기록 */}
       <div className="card">
-        <h2>오늘의 루틴 ({today})</h2>
-        {loading ? (
+        <div className="row" style={{ justifyContent: "space-between", marginBottom: 12 }}>
+          <h2 style={{ margin: 0 }}>
+            {showHistory ? "실행 기록" : `오늘의 루틴 (${today})`}
+          </h2>
+          <button
+            className="btn-ghost"
+            style={{ fontSize: 12 }}
+            onClick={() => setShowHistory((v) => !v)}
+          >
+            {showHistory ? "오늘 루틴" : "기록 보기"}
+          </button>
+        </div>
+        {showHistory ? (
+          <HistoryView
+            uid={profile.uid}
+            repos={repos}
+            scheduleMap={scheduleMap}
+            today={today}
+          />
+        ) : loading ? (
           <p className="muted">불러오는 중…</p>
         ) : todayAlarms.length === 0 ? (
           <p className="muted">오늘 예정된 알람 인스턴스가 아직 없어요.</p>
@@ -420,7 +441,7 @@ export function Dashboard() {
               <div key={a.id} className="row" style={{ justifyContent: "space-between" }}>
                 <div className="row">
                   <span className="tag">{STATE_LABEL[a.state] ?? a.state}</span>
-                  <span>{schedules.find((s) => s.id === a.scheduleId)?.title ?? a.scheduleId}</span>
+                  <span>{scheduleMap.get(a.scheduleId) ?.title ?? a.scheduleId}</span>
                 </div>
                 {a.state !== "DONE" && a.state !== "MISSED" && (
                   <button className="btn btn-done" onClick={() => void handleMarkDone(a.id)}>
