@@ -2,7 +2,7 @@
 
 import { type AlarmInstance, type Repositories, type Schedule } from "@routizen/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { STATE_COLOR, STATE_LABEL } from "@/lib/alarmLabels";
+import { STATE_COLOR, getStateLabel } from "@/lib/alarmLabels";
 
 function formatDate(dateStr: string): string {
   const [y, m, d] = dateStr.split("-").map(Number);
@@ -81,7 +81,7 @@ export function HistoryView({ uid, repos, scheduleMap, today }: Props) {
                   className="tag"
                   style={{ color: STATE_COLOR[a.state] ?? "inherit" }}
                 >
-                  {STATE_LABEL[a.state]}
+                  {getStateLabel(a.state)}
                 </span>
               </div>
             ))}

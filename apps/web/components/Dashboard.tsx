@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { startPremiumCheckout } from "@/lib/billing";
 import { enablePush, isPushSupported, listenForegroundMessages } from "@/lib/messaging";
-import { STATE_LABEL } from "@/lib/alarmLabels";
+import { getStateLabel } from "@/lib/alarmLabels";
 import { createFirebaseRepositories } from "@/lib/repositories.firebase";
 import { HistoryView } from "./HistoryView";
 import { ScheduleForm, type NewSchedule } from "./ScheduleForm";
@@ -68,6 +68,8 @@ export function Dashboard() {
   const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  // 첫 오픈 후에는 unmount하지 않고 숨겨서 toggle 시 Firestore 재요청 방지
+  const [historyMounted, setHistoryMounted] = useState(false);
   // 폴링 콜백 안에서 최신 isPremium 을 읽기 위한 ref(stale closure 방지).
   const isPremiumRef = useRef(false);
   useEffect(() => {
@@ -412,19 +414,25 @@ export function Dashboard() {
           <button
             className="btn-ghost"
             style={{ fontSize: 12 }}
-            onClick={() => setShowHistory((v) => !v)}
+            onClick={() => {
+              setShowHistory((v) => !v);
+              setHistoryMounted(true);
+            }}
           >
             {showHistory ? "오늘 루틴" : "기록 보기"}
           </button>
         </div>
-        {showHistory ? (
-          <HistoryView
-            uid={profile.uid}
-            repos={repos}
-            scheduleMap={scheduleMap}
-            today={today}
-          />
-        ) : loading ? (
+        {historyMounted && (
+          <div style={{ display: showHistory ? undefined : "none" }}>
+            <HistoryView
+              uid={profile.uid}
+              repos={repos}
+              scheduleMap={scheduleMap}
+              today={today}
+            />
+          </div>
+        )}
+        {showHistory ? null : loading ? (
           <p className="muted">불러오는 중…</p>
         ) : todayAlarms.length === 0 ? (
           <p className="muted">오늘 예정된 알람 인스턴스가 아직 없어요.</p>
@@ -433,7 +441,7 @@ export function Dashboard() {
             {todayAlarms.map((a) => (
               <div key={a.id} className="row" style={{ justifyContent: "space-between" }}>
                 <div className="row">
-                  <span className="tag">{STATE_LABEL[a.state] ?? a.state}</span>
+                  <span className="tag">{getStateLabel(a.state)}</span>
                   <span>{scheduleMap.get(a.scheduleId)?.title ?? a.scheduleId}</span>
                 </div>
                 {a.state !== "DONE" && a.state !== "MISSED" && (

@@ -15,3 +15,8 @@ export const STATE_COLOR: Partial<Record<AlarmState, string>> = {
   OVERDUE: "#f59e0b",
   FINAL_NOTIFIED: "#f59e0b",
 };
+
+// Firestore 데이터는 런타임에 임의 string이 올 수 있으므로 unknown state에 대한 fallback 포함
+export function getStateLabel(state: string): string {
+  return (STATE_LABEL as Record<string, string | undefined>)[state] ?? state;
+}
