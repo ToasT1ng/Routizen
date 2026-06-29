@@ -31,6 +31,8 @@ export interface ScheduleRepository {
 export interface AlarmInstanceRepository {
   /** 특정 날짜(YYYY-MM-DD)의 사용자 알람 인스턴스 */
   listByDate(uid: string, date: string): Promise<AlarmInstance[]>;
+  /** beforeDate 이전 인스턴스 최근 count개 (date DESC) */
+  listRecent(uid: string, count: number, beforeDate: string): Promise<AlarmInstance[]>;
   /** "실행했음" — 완료 처리 */
   markDone(id: string): Promise<void>;
 }

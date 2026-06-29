@@ -13,6 +13,8 @@ import {
   getCountFromServer,
   getDoc,
   getDocs,
+  limit,
+  orderBy,
   query,
   runTransaction,
   setDoc,
@@ -121,6 +123,17 @@ export function createFirebaseRepositories(): Repositories {
           collection(db, "alarmInstances"),
           where("uid", "==", uid),
           where("date", "==", date),
+        );
+        const snap = await getDocs(q);
+        return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as AlarmInstance);
+      },
+      async listRecent(uid, count, beforeDate) {
+        const q = query(
+          collection(db, "alarmInstances"),
+          where("uid", "==", uid),
+          where("date", "<", beforeDate),
+          orderBy("date", "desc"),
+          limit(count),
         );
         const snap = await getDocs(q);
         return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as AlarmInstance);
