@@ -14,6 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { startPremiumCheckout } from "@/lib/billing";
 import { enablePush, isPushSupported, listenForegroundMessages } from "@/lib/messaging";
+import { STATE_LABEL } from "@/lib/alarmLabels";
 import { createFirebaseRepositories } from "@/lib/repositories.firebase";
 import { HistoryView } from "./HistoryView";
 import { ScheduleForm, type NewSchedule } from "./ScheduleForm";
@@ -54,14 +55,6 @@ function describeRecurrence(r: Recurrence): string {
   }
 }
 
-const STATE_LABEL: Record<string, string> = {
-  SCHEDULED: "대기",
-  STARTED: "진행 중",
-  DONE: "완료 ✓",
-  OVERDUE: "지남",
-  FINAL_NOTIFIED: "마지막 알림",
-  MISSED: "미실행",
-};
 
 export function Dashboard() {
   const { profile, signOut, refreshProfile } = useAuth();
@@ -441,7 +434,7 @@ export function Dashboard() {
               <div key={a.id} className="row" style={{ justifyContent: "space-between" }}>
                 <div className="row">
                   <span className="tag">{STATE_LABEL[a.state] ?? a.state}</span>
-                  <span>{scheduleMap.get(a.scheduleId) ?.title ?? a.scheduleId}</span>
+                  <span>{scheduleMap.get(a.scheduleId)?.title ?? a.scheduleId}</span>
                 </div>
                 {a.state !== "DONE" && a.state !== "MISSED" && (
                   <button className="btn btn-done" onClick={() => void handleMarkDone(a.id)}>

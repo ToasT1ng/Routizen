@@ -1,27 +1,10 @@
 "use client";
 
 import { type AlarmInstance, type Repositories, type Schedule } from "@routizen/core";
-import { useCallback, useEffect, useState } from "react";
-
-const STATE_LABEL: Record<string, string> = {
-  SCHEDULED: "대기",
-  STARTED: "진행 중",
-  DONE: "완료 ✓",
-  OVERDUE: "지남",
-  FINAL_NOTIFIED: "마지막 알림",
-  MISSED: "미실행",
-};
-
-// terminal 상태별 색상 — CSS 변수가 없으면 기본값 사용
-const STATE_COLOR: Record<string, string> = {
-  DONE: "#22c55e",
-  MISSED: "#ef4444",
-  OVERDUE: "#f59e0b",
-  FINAL_NOTIFIED: "#f59e0b",
-};
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { STATE_COLOR, STATE_LABEL } from "@/lib/alarmLabels";
 
 function formatDate(dateStr: string): string {
-  // dateStr: "YYYY-MM-DD" — 로컬 자정 기준으로 파싱
   const [y, m, d] = dateStr.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString("ko-KR", {
     month: "long",
@@ -40,12 +23,16 @@ interface Props {
 export function HistoryView({ uid, repos, scheduleMap, today }: Props) {
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<AlarmInstance[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await repos.alarms.listRecent(uid, 60, today);
       setItems(data);
+    } catch {
+      setError("기록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.");
     } finally {
       setLoading(false);
     }
@@ -55,15 +42,26 @@ export function HistoryView({ uid, repos, scheduleMap, today }: Props) {
     void load();
   }, [load]);
 
-  if (loading) return <p className="muted">불러오는 중…</p>;
-  if (items.length === 0) return <p className="muted">아직 실행 기록이 없어요.</p>;
+  // items는 Firestore orderBy(date DESC)로 반환되므로 Map 삽입 순서가 곧 날짜 내림차순
+  const byDate = useMemo(() => {
+    const map = new Map<string, AlarmInstance[]>();
+    for (const item of items) {
+      if (!map.has(item.date)) map.set(item.date, []);
+      map.get(item.date)!.push(item);
+    }
+    return map;
+  }, [items]);
 
-  // date DESC 순서로 날짜별 그룹화
-  const byDate = new Map<string, AlarmInstance[]>();
-  for (const item of items) {
-    if (!byDate.has(item.date)) byDate.set(item.date, []);
-    byDate.get(item.date)!.push(item);
-  }
+  if (loading) return <p className="muted">불러오는 중…</p>;
+  if (error) return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <p className="muted" style={{ margin: 0 }}>{error}</p>
+      <button className="btn-ghost" style={{ fontSize: 12 }} onClick={() => void load()}>
+        다시 시도
+      </button>
+    </div>
+  );
+  if (items.length === 0) return <p className="muted">아직 실행 기록이 없어요.</p>;
 
   return (
     <div style={{ display: "grid", gap: 20 }}>
@@ -83,7 +81,7 @@ export function HistoryView({ uid, repos, scheduleMap, today }: Props) {
                   className="tag"
                   style={{ color: STATE_COLOR[a.state] ?? "inherit" }}
                 >
-                  {STATE_LABEL[a.state] ?? a.state}
+                  {STATE_LABEL[a.state]}
                 </span>
               </div>
             ))}
