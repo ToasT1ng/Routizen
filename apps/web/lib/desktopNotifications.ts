@@ -63,9 +63,20 @@ export function startDesktopNotificationBridge(uid: string): () => void {
   return unsub;
 }
 
+/** 현재 네이티브 알림 권한 상태 확인 (권한 요청 없음). */
+export async function getNativePermission(): Promise<"granted" | "default"> {
+  const { isPermissionGranted } = await import("@tauri-apps/plugin-notification");
+  return (await isPermissionGranted()) ? "granted" : "default";
+}
+
+/** 네이티브 알림 권한 요청. 이미 거부된 경우 OS 대화상자 없이 "denied" 반환. */
+export async function requestNativePermission(): Promise<"granted" | "denied" | "default"> {
+  const { requestPermission } = await import("@tauri-apps/plugin-notification");
+  return requestPermission();
+}
+
 /** @tauri-apps/plugin-notification 으로 OS 알림 발송 (권한 미허용 시 요청). */
 async function fireLocalNotification(title: string, body: string): Promise<void> {
-  // Tauri 전용 모듈 — 브라우저 번들에 정적 포함되지 않도록 동적 import.
   const { isPermissionGranted, requestPermission, sendNotification } = await import(
     "@tauri-apps/plugin-notification"
   );
@@ -74,6 +85,6 @@ async function fireLocalNotification(title: string, body: string): Promise<void>
     granted = (await requestPermission()) === "granted";
   }
   if (granted) {
-    sendNotification({ title, body });
+    await sendNotification({ title, body });
   }
 }
