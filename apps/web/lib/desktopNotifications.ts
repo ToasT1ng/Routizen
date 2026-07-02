@@ -63,17 +63,29 @@ export function startDesktopNotificationBridge(uid: string): () => void {
   return unsub;
 }
 
-/** @tauri-apps/plugin-notification 으로 OS 알림 발송 (권한 미허용 시 요청). */
+/**
+ * 현재 네이티브 알림 권한 상태 확인 (권한 요청 없음).
+ * macOS: isPermissionGranted()는 "denied"와 "not-asked" 모두 false를 반환하므로
+ * 두 경우를 구분할 수 없다. false → "default" 로 반환하며, 실제 거부 여부는
+ * requestNativePermission() 호출 후에만 알 수 있다.
+ */
+export async function getNativePermission(): Promise<"granted" | "default"> {
+  const { isPermissionGranted } = await import("@tauri-apps/plugin-notification");
+  return (await isPermissionGranted()) ? "granted" : "default";
+}
+
+/** 네이티브 알림 권한 요청. 이미 거부된 경우 OS 대화상자 없이 "denied" 반환. */
+export async function requestNativePermission(): Promise<"granted" | "denied" | "default"> {
+  const { requestPermission } = await import("@tauri-apps/plugin-notification");
+  return requestPermission();
+}
+
+/** @tauri-apps/plugin-notification 으로 OS 알림 발송. 권한이 없으면 무시한다. */
 async function fireLocalNotification(title: string, body: string): Promise<void> {
-  // Tauri 전용 모듈 — 브라우저 번들에 정적 포함되지 않도록 동적 import.
-  const { isPermissionGranted, requestPermission, sendNotification } = await import(
+  const { isPermissionGranted, sendNotification } = await import(
     "@tauri-apps/plugin-notification"
   );
-  let granted = await isPermissionGranted();
-  if (!granted) {
-    granted = (await requestPermission()) === "granted";
-  }
-  if (granted) {
-    sendNotification({ title, body });
+  if (await isPermissionGranted()) {
+    await sendNotification({ title, body });
   }
 }

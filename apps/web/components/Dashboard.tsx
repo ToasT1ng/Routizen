@@ -15,6 +15,7 @@ import { useAuth } from "@/lib/auth";
 import { startPremiumCheckout } from "@/lib/billing";
 import { enablePush, isPushSupported, listenForegroundMessages } from "@/lib/messaging";
 import { getStateLabel } from "@/lib/alarmLabels";
+import { getNativePermission, isTauri, requestNativePermission } from "@/lib/desktopNotifications";
 import { createFirebaseRepositories } from "@/lib/repositories.firebase";
 import { HistoryView } from "./HistoryView";
 import { ScheduleForm, type NewSchedule } from "./ScheduleForm";
@@ -63,6 +64,7 @@ export function Dashboard() {
   const [todayAlarms, setTodayAlarms] = useState<AlarmInstance[]>([]);
   const [loading, setLoading] = useState(true);
   const [pushStatus, setPushStatus] = useState<PushStatus>("checking");
+  const [nativePermission, setNativePermission] = useState<"checking" | "granted" | "denied" | "default">("checking");
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [billingMsg, setBillingMsg] = useState<string | null>(null);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
@@ -107,6 +109,11 @@ export function Dashboard() {
   useEffect(() => {
     let unsub: (() => void) | undefined;
     void (async () => {
+      if (isTauri()) {
+        // Tauri: WKWebView 는 FCM 미지원 — 네이티브 알림 권한만 확인.
+        setNativePermission(await getNativePermission());
+        return;
+      }
       if (!(await isPushSupported())) {
         setPushStatus("unsupported");
         return;
@@ -115,6 +122,11 @@ export function Dashboard() {
       unsub = await listenForegroundMessages();
     })();
     return () => unsub?.();
+  }, []);
+
+  const handleEnableNative = useCallback(async () => {
+    const result = await requestNativePermission();
+    setNativePermission(result);
   }, []);
 
   const handleEnablePush = useCallback(async () => {
@@ -361,10 +373,27 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* 푸시 알림 (FCM 웹 푸시 — 기획 2.5 / 3.2) */}
+      {/* 알림 — Tauri: 네이티브 macOS 알림 / 브라우저: FCM 웹 푸시 (기획 2.5 / 3.2) */}
       <div className="card">
         <h2>알림</h2>
-        {pushStatus === "checking" ? (
+        {isTauri() ? (
+          nativePermission === "checking" ? (
+            <p className="muted">확인 중…</p>
+          ) : nativePermission === "granted" ? (
+            <p className="muted">알림이 켜져 있어요 ✓</p>
+          ) : nativePermission === "denied" ? (
+            <p className="muted">
+              알림이 거부됐어요. 시스템 설정 → 알림에서 Routizen을 허용해 주세요.
+            </p>
+          ) : (
+            <div className="row" style={{ justifyContent: "space-between" }}>
+              <span className="muted">알림을 켜면 시작·끝·마지막 루틴을 Mac 알림으로 받을 수 있어요.</span>
+              <button className="btn" onClick={() => void handleEnableNative()}>
+                알림 켜기
+              </button>
+            </div>
+          )
+        ) : pushStatus === "checking" ? (
           <p className="muted">확인 중…</p>
         ) : (
           <div className="row" style={{ justifyContent: "space-between" }}>
