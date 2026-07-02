@@ -126,7 +126,7 @@ export function Dashboard() {
 
   const handleEnableNative = useCallback(async () => {
     const result = await requestNativePermission();
-    setNativePermission(result === "default" ? "default" : result);
+    setNativePermission(result);
   }, []);
 
   const handleEnablePush = useCallback(async () => {
