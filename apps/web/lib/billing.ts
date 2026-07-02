@@ -2,6 +2,7 @@
 
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { getFirebaseApp } from "./firebase";
+import { isTauri } from "./desktopNotifications";
 
 // Functions 배포 리전(알람 큐와 동일 — firebase/functions/src/config.ts 의 FUNCTIONS_REGION 과
 // 일치해야 함). 기본값은 양쪽 다 asia-northeast3.
@@ -14,11 +15,6 @@ export type CheckoutError = "already-premium" | "not-configured" | "error";
  * null — 정상 리다이렉트(브라우저). 이후 반환 없음.
  */
 export type CheckoutResult = CheckoutError | "external" | null;
-
-/** Tauri Webview 내부인지 감지(런타임 전용 — SSR 에서는 항상 false). */
-function isTauri(): boolean {
-  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-}
 
 /** Tauri 환경에서 URL 을 기본 브라우저로 엽니다(tauri-plugin-shell 공식 API 사용). */
 async function openInBrowser(url: string): Promise<void> {
