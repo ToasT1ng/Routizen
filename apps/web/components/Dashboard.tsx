@@ -5,7 +5,6 @@ import {
   canCreateSchedule,
   remainingFreeSlots,
   toDateKey,
-  type AlarmInstance,
   type AlarmStyle,
   type Recurrence,
   type Schedule,
@@ -14,9 +13,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { startPremiumCheckout } from "@/lib/billing";
 import { enablePush, isPushSupported, listenForegroundMessages } from "@/lib/messaging";
-import { getStateLabel } from "@/lib/alarmLabels";
 import { getNativePermission, isTauri, requestNativePermission } from "@/lib/desktopNotifications";
 import { createFirebaseRepositories } from "@/lib/repositories.firebase";
+import { CalendarView } from "./CalendarView";
 import { HistoryView } from "./HistoryView";
 import { ScheduleForm, type NewSchedule } from "./ScheduleForm";
 
@@ -61,8 +60,6 @@ export function Dashboard() {
   const { profile, signOut, refreshProfile } = useAuth();
   const repos = useMemo(() => createFirebaseRepositories(), []);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
-  const [todayAlarms, setTodayAlarms] = useState<AlarmInstance[]>([]);
-  const [loading, setLoading] = useState(true);
   const [pushStatus, setPushStatus] = useState<PushStatus>("checking");
   const [nativePermission, setNativePermission] = useState<"checking" | "granted" | "denied" | "default">("checking");
   const [checkoutBusy, setCheckoutBusy] = useState(false);
@@ -88,18 +85,8 @@ export function Dashboard() {
 
   const reload = useCallback(async () => {
     if (!uid) return;
-    setLoading(true);
-    try {
-      const [s, a] = await Promise.all([
-        repos.schedules.listActive(uid),
-        repos.alarms.listByDate(uid, today),
-      ]);
-      setSchedules(s);
-      setTodayAlarms(a);
-    } finally {
-      setLoading(false);
-    }
-  }, [repos, uid, today]);
+    setSchedules(await repos.schedules.listActive(uid));
+  }, [repos, uid]);
 
   useEffect(() => {
     void reload();
@@ -338,10 +325,9 @@ export function Dashboard() {
     await refreshProfile();
   };
 
-  const handleMarkDone = async (id: string) => {
+  const handleMarkDone = useCallback(async (id: string) => {
     await repos.alarms.markDone(id);
-    await reload();
-  };
+  }, [repos]);
 
   return (
     <div className="container">
@@ -434,12 +420,20 @@ export function Dashboard() {
         )}
       </div>
 
-      {/* 오늘의 루틴 / 실행 기록 */}
+      {/* 캘린더 (일/주/월 뷰) */}
+      <CalendarView
+        uid={profile.uid}
+        repos={repos}
+        schedules={schedules}
+        scheduleMap={scheduleMap}
+        today={today}
+        onMarkDone={handleMarkDone}
+      />
+
+      {/* 실행 기록 */}
       <div className="card">
         <div className="row" style={{ justifyContent: "space-between", marginBottom: 12 }}>
-          <h2 style={{ margin: 0 }}>
-            {showHistory ? "실행 기록" : `오늘의 루틴 (${today})`}
-          </h2>
+          <h2 style={{ margin: 0 }}>실행 기록</h2>
           <button
             className="btn-ghost"
             style={{ fontSize: 12 }}
@@ -448,7 +442,7 @@ export function Dashboard() {
               setHistoryMounted(true);
             }}
           >
-            {showHistory ? "오늘 루틴" : "기록 보기"}
+            {showHistory ? "접기" : "기록 보기"}
           </button>
         </div>
         {historyMounted && (
@@ -461,26 +455,10 @@ export function Dashboard() {
             />
           </div>
         )}
-        {showHistory ? null : loading ? (
-          <p className="muted">불러오는 중…</p>
-        ) : todayAlarms.length === 0 ? (
-          <p className="muted">오늘 예정된 알람 인스턴스가 아직 없어요.</p>
-        ) : (
-          <div style={{ display: "grid", gap: 10 }}>
-            {todayAlarms.map((a) => (
-              <div key={a.id} className="row" style={{ justifyContent: "space-between" }}>
-                <div className="row">
-                  <span className="tag">{getStateLabel(a.state)}</span>
-                  <span>{scheduleMap.get(a.scheduleId)?.title ?? a.scheduleId}</span>
-                </div>
-                {a.state !== "DONE" && a.state !== "MISSED" && (
-                  <button className="btn btn-done" onClick={() => void handleMarkDone(a.id)}>
-                    실행했음
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
+        {!showHistory && (
+          <p className="muted" style={{ margin: 0 }}>
+            루틴 실행 이력을 확인할 수 있어요.
+          </p>
         )}
       </div>
 
