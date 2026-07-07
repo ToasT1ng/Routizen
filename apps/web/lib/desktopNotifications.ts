@@ -89,3 +89,16 @@ async function fireLocalNotification(title: string, body: string): Promise<void>
     await sendNotification({ title, body });
   }
 }
+
+/** 로그인 시 자동 실행 여부를 반환한다. */
+export async function getAutostart(): Promise<boolean> {
+  const { isEnabled } = await import("@tauri-apps/plugin-autostart");
+  return isEnabled();
+}
+
+/** 로그인 시 자동 실행을 켜거나 끈다. */
+export async function setAutostart(enabled: boolean): Promise<void> {
+  const { enable, disable } = await import("@tauri-apps/plugin-autostart");
+  if (enabled) await enable();
+  else await disable();
+}

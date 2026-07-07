@@ -1,8 +1,9 @@
 use tauri::{
     menu::{Menu, MenuItem},
-    tray::TrayIconBuilder,
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Manager, WindowEvent,
 };
+use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_deep_link::DeepLinkExt;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -15,6 +16,8 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         // 커스텀 URL 스킴 — routizen://checkout/success 수신 시 webview 에 checkout-complete 이벤트 전달.
         .plugin(tauri_plugin_deep_link::init())
+        // 로그인 시 자동 실행 — LaunchAgent 로 ~/Library/LaunchAgents 에 plist 등록(기획 3.2).
+        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
         .setup(|app| {
             let handle = app.handle().clone();
             app.deep_link().on_open_urls(move |event| {
@@ -34,6 +37,21 @@ pub fn run() {
                 .icon(app.default_window_icon().unwrap().clone())
                 .tooltip("Routizen")
                 .menu(&menu)
+                // 트레이 아이콘 왼쪽 클릭 → 창 표시/포커스.
+                // 오른쪽 클릭은 Tauri 가 자동으로 컨텍스트 메뉴를 띄운다.
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        if let Some(win) = tray.app_handle().get_webview_window("main") {
+                            let _ = win.show();
+                            let _ = win.set_focus();
+                        }
+                    }
+                })
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => {
                         if let Some(win) = app.get_webview_window("main") {
