@@ -126,8 +126,12 @@ export function Dashboard() {
 
   const handleToggleAutostart = useCallback(async () => {
     const next = !autostartEnabled;
-    await setAutostart(next);
-    setAutostartEnabled(next);
+    try {
+      await setAutostart(next);
+      setAutostartEnabled(next);
+    } catch {
+      // 시스템 상태 변경 실패 시 UI를 이전 값으로 유지 — 불일치 방지.
+    }
   }, [autostartEnabled]);
 
   const handleEnablePush = useCallback(async () => {
