@@ -69,6 +69,8 @@ export function Dashboard() {
   const [pushStatus, setPushStatus] = useState<PushStatus>("checking");
   const [nativePermission, setNativePermission] = useState<"checking" | "granted" | "denied" | "default">("checking");
   const [autostartEnabled, setAutostartEnabled] = useState<boolean | null>(null);
+  const [autostartBusy, setAutostartBusy] = useState(false);
+  const [autostartError, setAutostartError] = useState<string | null>(null);
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [billingMsg, setBillingMsg] = useState<string | null>(null);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
@@ -126,11 +128,15 @@ export function Dashboard() {
 
   const handleToggleAutostart = useCallback(async () => {
     const next = !autostartEnabled;
+    setAutostartBusy(true);
+    setAutostartError(null);
     try {
       await setAutostart(next);
       setAutostartEnabled(next);
     } catch {
-      // 시스템 상태 변경 실패 시 UI를 이전 값으로 유지 — 불일치 방지.
+      setAutostartError("자동 실행 설정 변경에 실패했어요. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setAutostartBusy(false);
     }
   }, [autostartEnabled]);
 
@@ -419,11 +425,17 @@ export function Dashboard() {
             <span className="muted">로그인 시 자동 실행</span>
             <button
               className={autostartEnabled ? "btn" : "btn-ghost"}
+              disabled={autostartBusy}
               onClick={() => void handleToggleAutostart()}
             >
-              {autostartEnabled ? "켜짐" : "꺼짐"}
+              {autostartBusy ? "처리 중…" : autostartEnabled ? "켜짐" : "꺼짐"}
             </button>
           </div>
+          {autostartError && (
+            <p className="muted" style={{ marginTop: 8 }}>
+              {autostartError}
+            </p>
+          )}
         </div>
       )}
 
