@@ -13,7 +13,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { startPremiumCheckout } from "@/lib/billing";
 import { enablePush, isPushSupported, listenForegroundMessages } from "@/lib/messaging";
-import { getNativePermission, isTauri, requestNativePermission } from "@/lib/desktopNotifications";
+import {
+  getAutostart,
+  getNativePermission,
+  isTauri,
+  requestNativePermission,
+  setAutostart,
+} from "@/lib/desktopNotifications";
 import { createFirebaseRepositories } from "@/lib/repositories.firebase";
 import { CalendarView } from "./CalendarView";
 import { HistoryView } from "./HistoryView";
@@ -62,6 +68,9 @@ export function Dashboard() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [pushStatus, setPushStatus] = useState<PushStatus>("checking");
   const [nativePermission, setNativePermission] = useState<"checking" | "granted" | "denied" | "default">("checking");
+  const [autostartEnabled, setAutostartEnabled] = useState<boolean | null>(null);
+  const [autostartBusy, setAutostartBusy] = useState(false);
+  const [autostartError, setAutostartError] = useState<string | null>(null);
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [billingMsg, setBillingMsg] = useState<string | null>(null);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
@@ -97,8 +106,9 @@ export function Dashboard() {
     let unsub: (() => void) | undefined;
     void (async () => {
       if (isTauri()) {
-        // Tauri: WKWebView 는 FCM 미지원 — 네이티브 알림 권한만 확인.
+        // Tauri: WKWebView 는 FCM 미지원 — 네이티브 알림 권한 + 자동 실행 상태 확인.
         setNativePermission(await getNativePermission());
+        setAutostartEnabled(await getAutostart());
         return;
       }
       if (!(await isPushSupported())) {
@@ -115,6 +125,20 @@ export function Dashboard() {
     const result = await requestNativePermission();
     setNativePermission(result);
   }, []);
+
+  const handleToggleAutostart = useCallback(async () => {
+    const next = !autostartEnabled;
+    setAutostartBusy(true);
+    setAutostartError(null);
+    try {
+      await setAutostart(next);
+      setAutostartEnabled(next);
+    } catch {
+      setAutostartError("자동 실행 설정 변경에 실패했어요. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setAutostartBusy(false);
+    }
+  }, [autostartEnabled]);
 
   const handleEnablePush = useCallback(async () => {
     if (!uid) return;
@@ -392,6 +416,28 @@ export function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* 로그인 시 자동 실행 — Tauri 맥앱 전용 (기획 3.2) */}
+      {isTauri() && autostartEnabled !== null && (
+        <div className="card">
+          <h2>시스템 설정</h2>
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <span className="muted">로그인 시 자동 실행</span>
+            <button
+              className={autostartEnabled ? "btn" : "btn-ghost"}
+              disabled={autostartBusy}
+              onClick={() => void handleToggleAutostart()}
+            >
+              {autostartBusy ? "처리 중…" : autostartEnabled ? "켜짐" : "꺼짐"}
+            </button>
+          </div>
+          {autostartError && (
+            <p className="muted" style={{ marginTop: 8 }}>
+              {autostartError}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* 프리미엄 구독 (Stripe — 기획 3.5) */}
       <div className={`card${!profile.isPremium && !canCreate ? " card--alert" : ""}`}>
